@@ -166,3 +166,28 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .chat-input button:disabled { background: #b8c5ce; cursor: default; }
 @media (max-width: 480px) { .chat-widget { right: 16px; bottom: 16px; } .chat-panel { height: calc(100vh - 110px); } }
 @media (prefers-reduced-motion: reduce) { .chat-panel, .chat-typing span { animation: none; } .chat-launcher { transition: none; } }
+.availability-guide { padding: 14px 18px; margin: 0 0 22px; border: 1px solid #d9e3eb; border-radius: 8px; background: #eff4f8; font-size: 11px; color: #4c687e; line-height: 1.6; }
+.availability-guide p { margin: 4px 0 8px; }
+.availability-guide a { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.availability-status { display: block; margin-top: 7px; font-size: 10px; color: #647c80; line-height: 1.5; }
+.availability-status > span { display: block; }
+.availability-status small { display: block; font-size: 9px; color: #83919c; }
+.availability-status.reserved { color: #8b6a25; }
+.availability-status.full { color: #a45151; }
+.availability-raw { margin-top: 8px; font-size: 12px; }
+.selected-course .availability-status { font-size: 10px; }
+
+.seat-metric { display: block; margin-top: 9px; }
+.seat-label { display: block; font-size: 10px; font-weight: 600; color: #38566e; margin-bottom: 4px; }
+.seat-bar { display: block; position: relative; height: 22px; border-radius: 5px; background: #e7edf1; overflow: hidden; box-shadow: inset 0 1px 3px #20344912; }
+.seat-fill { display: block; position: absolute; inset: 0 auto 0 0; background: #a8c9de; transition: width .3s ease; }
+.seat-metric:nth-child(2) .seat-fill { background: #c9c2e2; }
+.seat-bar.empty { background: #f6e6e5; }
+.seat-count { position: relative; display: block; text-align: center; line-height: 22px; font-weight: 600; color: #233e54; font-size: 11px; }
+.seat-warning { display: block; color: #946826; font-size: 10px; margin-top: 5px; }
+.auto-update-status { display: inline-block; margin-left: 12px; font-size: 10px; color: #526b7c; }
+.selected-course .availability-status .seat-label { font-size: 10px; }
+.selected-course .availability-status .seat-count { font-size: 11px; margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .seat-fill { transition: none; } }
+
+.selected-course .seat-fill { margin-top: 0; }

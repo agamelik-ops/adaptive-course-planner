@@ -1,5 +1,7 @@
 "use client";
 
+import AvailabilityStatus from "./availability-status";
+import type { Availability } from "../lib/availability";
 import { useEffect, useRef } from "react";
 import { meeting, type Course } from "../lib/courses";
 
@@ -7,7 +9,7 @@ const classYears: Record<string, string> = {
   FR: "First-year students", SO: "Sophomores", JR: "Juniors", SR: "Seniors",
 };
 
-export default function CourseDetails({ course, onClose }: { course: Course; onClose: () => void }) {
+export default function CourseDetails({ course, availability, onClose }: { course: Course; availability?: Availability; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -31,6 +33,7 @@ export default function CourseDetails({ course, onClose }: { course: Course; onC
       <p className="details-section">Spring 2027 · CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}</p>
       <p className="details-meetings">{meeting(course)}</p>
       <dl className="details-facts">
+        <div><dt>Seat availability</dt><dd><AvailabilityStatus record={availability} detailed /></dd></div>
         <div><dt>Instructor</dt><dd>{course.instructors.length ? course.instructors.join("; ") : "Not listed"}</dd></div>
         <div><dt>Prerequisites</dt><dd>{course.prereq || "None listed"}</dd></div>
         <div><dt>Permission</dt><dd>{course.permission ? "Permission required" : "No permission requirement listed"}</dd></div>
