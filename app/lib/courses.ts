@@ -9,6 +9,10 @@ export type Course = {
   title: string;
   meetings: Meeting[];
   color: string;
+  instructors: string[];
+  prereq: string;
+  permission: boolean;
+  closedTo: string[];
 };
 
 const subjects: Record<string, string> = {
@@ -38,6 +42,8 @@ export const courses: Course[] = COURSES.map((course) => {
   return {
     crn: course.crn, code: course.code, section: course.section,
     subject: subjects[prefix] ?? prefix, title: course.title,
+    instructors: course.instructors, prereq: course.prereq,
+    permission: course.permission, closedTo: course.closedTo,
     color: colors[Object.keys(subjects).indexOf(prefix) % colors.length] ?? "blue",
     meetings: course.meetings.map((item) => ({
       type: item.type, days: item.days.map((day) => dayNames.indexOf(day)).filter((day) => day >= 0),
