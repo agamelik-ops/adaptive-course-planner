@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { downloadPlan, downloadPlanPng, printPlan } from "../lib/download-plan";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -51,7 +52,7 @@ export default function Planner() {
   return (
     <>
       <header className="site-header">
-        <Link href="/" className="wordmark">F&M <span>FRANKLIN & MARSHALL<br />COURSE PLANNER</span></Link>
+        <Link href="/" className="wordmark" aria-label="Franklin & Marshall College Course Planner home"><Image src="/fm-logo.png" alt="Franklin & Marshall College" width={1023} height={198} priority className="wordmark-logo" /><span>COURSE<br />PLANNER</span></Link>
         <span className="header-tag">A little planning. A lot of possibility.</span>
       </header>
       <main className="planner-shell">

@@ -10,6 +10,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .site-header { min-height: 90px; background: #173c64; color: white; display: flex; align-items: center; justify-content: space-between; padding: 20px max(5vw, 24px); }
 .wordmark { display: flex; align-items: center; gap: 18px; text-decoration: none; font-family: Georgia, serif; font-size: 38px; letter-spacing: -2px; }
 .wordmark span { border-left: 1px solid #ffffff55; padding-left: 18px; font-family: Arial, sans-serif; font-size: 10px; line-height: 1.7; letter-spacing: 1.8px; }
+.wordmark-logo { display: block; height: 46px; width: auto; }
+@media (max-width: 720px) { .wordmark-logo { height: 34px; } .wordmark { gap: 12px; } .wordmark span { padding-left: 12px; } }
+@media (max-width: 420px) { .wordmark span { display: none; } }
 .header-tag { color: #d5e0ed; font-size: 12px; }
 .planner-shell { max-width: 1600px; width: 100%; margin: auto; padding: 44px 5vw 22px; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
