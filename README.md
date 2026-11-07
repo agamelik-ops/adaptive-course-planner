@@ -71,3 +71,5 @@ The extension stores only CRNs, displayed seat status, timestamps, and local sch
 Checks: `node --test scripts/availability.test.mjs`, `npm run lint`, and `npx tsc --noEmit`. Reload and test the updated extension in Chrome as well; fixture tests do not verify a real signed-in session or scheduled browser wakeups.
 
 The extension popup also retains **Import Degree Works requirements**. Open your Degree Works audit, expand the relevant sections, and use that button. The original preview/confirmation is preserved; only approved requirement names and statuses are stored locally as a partial audit. Availability connection and Degree Works import remain separate actions.
+
+The popup displays Connecting while setup/initial import is underway, Connected to F&M after a successful sync, and Not connected for paused or overdue updates. It shows the last successful sync time and completed section count; the Connect button is replaced by Disconnect while connected.

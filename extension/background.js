@@ -35,7 +35,7 @@ async function refresh() {
     const job = (await chrome.storage.local.get(jobKey))[jobKey];
     if (job?.state !== "complete") throw new Error(job?.message || "Updates paused. The registration session may have expired.");
     const nextCheckAt = Date.now() + interval;
-    await chrome.storage.local.set({ [autoKey]: { ...current, state: "waiting", message: "Automatic updates on · Every 5 minutes", updatedAt: Date.now(), nextCheckAt } });
+    await chrome.storage.local.set({ [autoKey]: { ...current, state: "waiting", lastSuccessfulAt: Date.now(), message: "Automatic updates on · Every 5 minutes", updatedAt: Date.now(), nextCheckAt } });
     await chrome.alarms.create(alarmName, { when: nextCheckAt });
   } catch (error) {
     if (runGeneration !== generation) return;

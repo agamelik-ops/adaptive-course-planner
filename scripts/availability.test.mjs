@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { syncAllAvailability } from '../extension/full-sync.mjs';
+import { connectionView } from '../extension/connection-status.mjs';
 
 const moduleExports = {};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../app/lib/availability.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {exports: moduleExports});
@@ -174,4 +175,17 @@ test('merged extension preserves Degree Works import approval and availability p
   returnedAudit={version:1,partial:true,requirements:[{name:'Example requirement',status:'incomplete'}]};
   assert.equal(await importer(tab),true);assert.equal(writes,1);assert.equal(opened,1);
   await assert.rejects(()=>importer({id:1,url:'https://example.com/'}),/Degree Works audit/);
+});
+
+
+test('popup distinguishes connecting, successful connection, refreshing, and overdue updates',()=>{
+  const now=Date.now();
+  assert.equal(connectionView(null,null,now).label,'Not connected');
+  assert.equal(connectionView({enabled:true,state:'connecting',updatedAt:now},null,now).state,'connecting');
+  const waiting={enabled:true,state:'waiting',lastSuccessfulAt:now-1000,nextCheckAt:now+300000};
+  assert.equal(connectionView(waiting,{state:'complete',scanned:635},now).label,'Connected to F&M');
+  assert.equal(connectionView(waiting,{state:'complete',scanned:635},now).total,635);
+  assert.equal(connectionView({...waiting,state:'syncing',updatedAt:now},{state:'running',updatedAt:now},now).connected,true);
+  assert.equal(connectionView({...waiting,nextCheckAt:now-120000},null,now).active,false);
+  assert.equal(connectionView({...waiting,enabled:false},null,now).state,'disconnected');
 });

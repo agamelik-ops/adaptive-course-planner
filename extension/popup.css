@@ -1,3 +1,5 @@
 body{width:300px;padding:20px;margin:0;font:13px Arial,sans-serif;color:#203449;background:#f8fafb}h1{font:24px Georgia,serif;margin:0 0 14px}p{line-height:1.6;color:#637888}button{width:100%;padding:11px;border:0;border-radius:7px;background:#173c64;color:white;font:600 12px Arial;cursor:pointer}button:disabled{opacity:.5;cursor:default}.secondary{background:white;color:#173c64;border:1px solid #d6e0e6}button:focus-visible{outline:3px solid #548bba;outline-offset:2px}
 
 button + button{margin-top:9px}button[hidden]{display:none}
+
+.connection-card{background:white;border:1px solid #dde6ec;border-radius:9px;padding:12px;margin:0 0 16px}.connection-pill{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px}.connection-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#98a7b2;flex-shrink:0}.connection-pill.connected{color:#376a50}.connection-pill.connected::before{background:#4b966c}.connection-pill.connecting{color:#8b6d2e}.connection-pill.connecting::before{background:#c39741}#last-sync{font-size:10px;margin:7px 0 0;line-height:1.5}button[hidden]{display:none}

@@ -1,3 +1,4 @@
+import { connectionView } from "./connection-status.mjs";
 import { importDegreeAudit } from "./degree-audit.mjs";
 
 const status = document.getElementById("status");
@@ -9,12 +10,23 @@ async function render() {
   const saved = await chrome.storage.local.get([autoKey, jobKey]);
   const auto = saved[autoKey];
   const job = saved[jobKey];
-  start.disabled = !!auto?.enabled;
+  const view = connectionView(auto, job);
+  const pill = document.getElementById("connection");
+  pill.textContent = view.label;
+  pill.className = `connection-pill ${view.state}`;
+  document.getElementById("last-sync").textContent = view.lastSync
+    ? `Last synced ${new Date(view.lastSync).toLocaleString()}${view.total ? ` · ${view.total} sections` : ""}`
+    : "No successful sync yet";
+  start.hidden = view.connected;
+  start.disabled = view.active;
+  start.textContent = view.active ? "Connecting…" : auto ? "Reconnect to F&M" : "Connect to F&M";
   stop.hidden = !auto?.enabled;
-  status.textContent = auto?.state === "syncing" && job?.state === "running" ? job.message : auto?.message || "Only CRNs and seat status are stored locally. No account details are collected.";
+  status.textContent = view.message;
 }
 chrome.storage.onChanged.addListener((_changes, area) => { if (area === "local") void render(); });
 void render();
+// The popup is short-lived; update stale/paused state while it remains open.
+setInterval(() => void render(), 15000);
 start.addEventListener("click", async () => {
   start.disabled = true;
   try {
