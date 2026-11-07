@@ -53,10 +53,9 @@ export default function Planner() {
     <>
       <header className="site-header">
         <Link href="/" className="wordmark" aria-label="Franklin & Marshall College Course Planner home"><Image src="/fm-logo.png" alt="Franklin & Marshall College" width={1023} height={198} priority className="wordmark-logo" /><span>COURSE<br />PLANNER</span></Link>
-        <span className="header-tag">A little planning. A lot of possibility.</span>
       </header>
       <main className="planner-shell">
-        <div className="page-heading"><div><p className="eyebrow">YOUR NEXT CHAPTER</p><h1>Make room for what’s next.</h1><p>Find your classes. Build your week. See the possibilities.</p></div><span className="demo-badge">Spring 2027</span></div>
+        <div className="page-heading"><div><h1>Make room for what’s next.</h1><p>Find your classes. Build your week. See the possibilities.</p></div><span className="demo-badge">Spring 2027</span></div>
         <p className="demo-note">Courses from the imported Spring 2027 master schedule. Planning does not register you or confirm seat availability. Your plan saves automatically in this browser for Spring 2027.</p>
         <div className="planner-layout">
           <aside className="sidebar">
@@ -84,7 +83,7 @@ export default function Planner() {
             </section>
           </aside>
           <section className="panel schedule-panel" aria-labelledby="schedule-heading">
-            <div className="schedule-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h2 id="schedule-heading">Your weekly schedule</h2></div><div className="download-actions">
+            <div className="schedule-heading"><div><h2 id="schedule-heading">Your weekly schedule</h2></div><div className="download-actions">
               <div className="download-dropdown" ref={downloadRef} onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) setDownloadOpen(false);
               }} onKeyDown={(event) => {
@@ -140,8 +139,19 @@ export default function Planner() {
             <div className="schedule-footer"><span className="legend-dot" /> Courses appear as you add them <span>{loading ? "Restoring plan…" : selected.length ? `${selected.length} courses in your plan` : "Let’s build your week"}</span></div>
           </section>
         </div>
-        <footer className="page-footer"><span>Adaptive Course Planner · Made for your next chapter.</span><nav aria-label="More pages"><Link href="/planner">Registrar planner</Link></nav></footer>
       </main>
+      <footer className="site-footer">
+        <div className="footer-card">
+          <Link href="/" className="footer-logo" aria-label="Course Planner home"><Image src="/fm-logo-navy.png" alt="Franklin & Marshall College" width={1023} height={198} /></Link>
+          <div className="footer-info">
+            <p>Adaptive Course Planner</p>
+            <p>Spring 2027 schedule · Built by F&amp;M students</p>
+            <nav aria-label="More pages"><Link href="/planner">Registrar planner</Link></nav>
+            <p className="footer-motto">Lux et Lex</p>
+            <p className="footer-note">A student project for planning only. Not an official Franklin &amp; Marshall College website and does not register you for courses.</p>
+          </div>
+        </div>
+      </footer>
     </>
   );
 }
