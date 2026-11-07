@@ -1,5 +1,5 @@
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({
-    url: "http://localhost:3000/planner"
+    url: "http://localhost:3000/"
   });
 });
