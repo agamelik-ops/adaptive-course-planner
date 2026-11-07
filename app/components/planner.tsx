@@ -21,6 +21,11 @@ export default function Planner() {
     setNotice(`${course.code} added to your plan.`);
   }
 
+  function remove(course: Course) {
+    setSelected((current) => current.filter((item) => item.crn !== course.crn));
+    setNotice(`${course.code} removed from your plan.`);
+  }
+
   return (
     <>
       <header className="site-header">
@@ -48,7 +53,7 @@ export default function Planner() {
             <section className="panel selected-panel" aria-labelledby="selected-heading">
               <div className="section-title"><h2 id="selected-heading">Your courses</h2><span>02</span></div>
               <div className="plan-totals"><strong>{selected.length} courses</strong><span>Credits unavailable</span></div>
-              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><div><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}</div><button aria-label={`Remove ${course.code}`} onClick={() => { setSelected((current) => current.filter((item) => item.crn !== course.crn)); setNotice(`${course.code} removed from your plan.`); }}>×</button></li>)}</ul>}
+              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><div><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}</div><button aria-label={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></li>)}</ul>}
               <p className="sr-only" role="status">{notice}</p>
             </section>
           </aside>
@@ -69,7 +74,7 @@ export default function Planner() {
                     });
                     return dayEvents.map((course) => {
                       const laneIndex = lanes.findIndex((lane) => lane.includes(course));
-                      return <div key={course.eventId} className={`calendar-event ${course.color}`} style={{ top: course.start - 480, height: course.end - course.start, left: `calc(${laneIndex * 100 / lanes.length}% + 3px)`, width: `calc(${100 / lanes.length}% - 6px)` }}><strong>{course.code}{course.type === "LAB" ? " · Lab" : ""}</strong><span>{time(course.start)}–{time(course.end)}</span><span className="event-title">{course.title} · {course.crn}</span></div>;
+                      return <div key={course.eventId} className={`calendar-event ${course.color}`} style={{ top: course.start - 480, height: course.end - course.start, left: `calc(${laneIndex * 100 / lanes.length}% + 3px)`, width: `calc(${100 / lanes.length}% - 6px)` }}><strong>{course.code}{course.type === "LAB" ? " · Lab" : ""}</strong><span>{time(course.start)}–{time(course.end)}</span><span className="event-title">{course.title} · {course.crn}</span><button className="event-remove" aria-label={`Remove ${course.code} from your plan`} title={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></div>;
                     });
                   })()}
                 </div>)}
