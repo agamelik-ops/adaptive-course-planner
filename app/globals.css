@@ -26,7 +26,9 @@ h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(30px, 3.2vw
 h2 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -.4px; }
 .section-title > span { font-size: 11px; color: #a2abae; }
 label { display: block; font-size: 11px; color: #66727d; margin-bottom: 9px; }
-.search-input { display: flex; align-items: center; border: 1px solid #b8c5ce; border-radius: 6px; background: #fcfdfd; padding-left: 11px; gap: 8px; }
+.search-input { display: flex; align-items: center; border: 1px solid #b8c5ce; border-radius: 6px; background: #fcfdfd; padding-left: 11px; gap: 8px; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.search-input:focus-within { border-color: #4d6f8c; box-shadow: 0 0 0 3px rgba(77, 111, 140, 0.18); }
+.search-input input:focus-visible { outline: none; }
 .search-input > span { font-size: 24px; color: #697b89; }
 .search-input input { width: 100%; min-width: 0; padding: 13px 8px 13px 0; font-size: 11px; background: transparent; border: 0; color: #203449; }
 .result-count { font-size: 10px; color: #7b858b; margin: 16px 0 5px; }
