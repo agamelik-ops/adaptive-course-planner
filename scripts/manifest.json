@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "F&M Adaptive Course Planner",
+  "version": "1.0.0",
+  "description": "Plan courses and track degree requirements before registration.",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Open F&M Planner"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
