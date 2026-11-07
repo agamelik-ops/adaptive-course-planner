@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { readPlan, restoreCourses, savePlan, serverPlan, subscribePlan } from "../lib/saved-plan";
 import { meeting, overlaps, searchCourses, time, type Course } from "../lib/courses";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default function Planner() {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Course[]>([]);
+  const savedPlan = useSyncExternalStore(subscribePlan, readPlan, serverPlan);
+  const selected = useMemo(() => restoreCourses(savedPlan), [savedPlan]);
+  const [saveError, setSaveError] = useState(false);
   const [notice, setNotice] = useState("");
   const results = searchCourses(query);
   const events = selected.flatMap((course) => course.meetings.map((item, index) => ({ ...course, ...item, eventId: `${course.crn}-${index}` })));
@@ -16,8 +19,12 @@ export default function Planner() {
     selected.slice(index + 1).filter((other) => overlaps(course, other)).map((other) => `${course.code} and ${other.code}`),
   );
 
+  function updatePlan(next: Course[]) {
+    setSaveError(!savePlan(next));
+  }
+
   function add(course: Course) {
-    setSelected((current) => current.some((item) => item.crn === course.crn) ? current : [...current, course]);
+    updatePlan(selected.some((item) => item.crn === course.crn) ? selected : [...selected, course]);
     setNotice(`${course.code} added to your plan.`);
   }
 
@@ -29,7 +36,7 @@ export default function Planner() {
       </header>
       <main className="planner-shell">
         <div className="page-heading"><div><p className="eyebrow">YOUR NEXT CHAPTER</p><h1>Make room for what’s next.</h1><p>Find your classes. Build your week. See the possibilities.</p></div><span className="demo-badge">Spring 2027</span></div>
-        <p className="demo-note">Courses from the imported Spring 2027 master schedule. Planning does not register you or confirm seat availability. Your plan lasts until you refresh.</p>
+        <p className="demo-note">Courses from the imported Spring 2027 master schedule. Planning does not register you or confirm seat availability. Your plan saves automatically in this browser for Spring 2027.</p>
         <div className="planner-layout">
           <aside className="sidebar">
             <section className="panel search-panel" aria-labelledby="find-heading">
@@ -47,8 +54,9 @@ export default function Planner() {
             </section>
             <section className="panel selected-panel" aria-labelledby="selected-heading">
               <div className="section-title"><h2 id="selected-heading">Your courses</h2><span>02</span></div>
+              <p className="save-status" role="status">{saveError ? "Could not save in this browser. Your changes will last for this session only." : "Auto-save enabled · This browser only"}</p>
               <div className="plan-totals"><strong>{selected.length} courses</strong><span>Credits unavailable</span></div>
-              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><div><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}</div><button aria-label={`Remove ${course.code}`} onClick={() => { setSelected((current) => current.filter((item) => item.crn !== course.crn)); setNotice(`${course.code} removed from your plan.`); }}>×</button></li>)}</ul>}
+              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><div><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}</div><button aria-label={`Remove ${course.code}`} onClick={() => { updatePlan(selected.filter((item) => item.crn !== course.crn)); setNotice(`${course.code} removed from your plan.`); }}>×</button></li>)}</ul>}
               <p className="sr-only" role="status">{notice}</p>
             </section>
           </aside>

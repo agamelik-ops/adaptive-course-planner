@@ -61,3 +61,5 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 @media (min-width: 1450px) { .planner-layout { grid-template-columns: 365px minmax(0, 1fr); } }
 @media (max-width: 950px) { .planner-layout { grid-template-columns: 300px minmax(0, 1fr); gap: 16px; }.planner-shell { padding: 30px 22px; }.header-tag { display: none; }.week-label { display: none; } }
 @media (max-width: 720px) { .planner-layout { grid-template-columns: 1fr; }.sidebar { grid-template-columns: 1fr; }.course-results { max-height: 300px; }.page-heading { align-items: start; }.demo-badge { font-size: 9px; padding: 6px 8px; }.page-footer { flex-direction: column; }.site-header { min-height: 75px; }.wordmark { font-size: 30px; }.schedule-heading { padding: 20px; } }
+
+.save-status { font-size: 11px; color: #64766e; line-height: 1.5; margin: 0 0 14px; }
