@@ -69,3 +69,33 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 @media (min-width: 1450px) { .planner-layout { grid-template-columns: 365px minmax(0, 1fr); } }
 @media (max-width: 950px) { .planner-layout { grid-template-columns: 300px minmax(0, 1fr); gap: 16px; }.planner-shell { padding: 30px 22px; }.header-tag { display: none; }.week-label { display: none; } }
 @media (max-width: 720px) { .planner-layout { grid-template-columns: 1fr; }.sidebar { grid-template-columns: 1fr; }.course-results { max-height: 300px; }.page-heading { align-items: start; }.demo-badge { font-size: 9px; padding: 6px 8px; }.page-footer { flex-direction: column; }.site-header { min-height: 75px; }.wordmark { font-size: 30px; }.schedule-heading { padding: 20px; } }
+
+.save-status { font-size: 11px; color: #64766e; line-height: 1.5; margin: 0 0 14px; }
+
+.download-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.plan-loading { color: #788891; font-size: 12px; min-height: 110px; padding: 12px 0; }
+.loading-bar { display: block; height: 14px; width: 80%; border-radius: 5px; background: #eaf0f2; margin: 0 0 16px; }
+.loading-bar:nth-child(2) { width: 55%; }
+.calendar-empty.plan-loading .loading-bar { width: 160px; height: 14px; margin: 0 auto 20px; border-radius: 5px; }
+@media (max-width: 720px) { .schedule-heading { align-items: flex-start; flex-wrap: wrap; }.download-actions { align-items: flex-start; } }
+
+.download-actions > p { max-width: 300px; font-size: 11px; color: #8b5159; }
+
+
+.schedule-panel { overflow: visible; }
+.download-dropdown { position: relative; }
+.download-trigger { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 1px solid #d6dfe5; border-radius: 7px; background: #fff; color: #294b69; font-size: 12px; font-weight: 600; box-shadow: 0 1px 2px #183b6307; }
+.download-trigger:hover { background: #f4f7fa; border-color: #aabfce; }
+.download-trigger:disabled { opacity: .45; cursor: default; }
+.chevron { margin-left: 5px; transition: transform .15s; }
+.chevron.is-open { transform: rotate(180deg); }
+.download-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 260px; padding: 8px; background: #fff; border: 1px solid #e0e6eb; border-radius: 11px; box-shadow: 0 12px 35px #193b6426, 0 2px 5px #193b640a; z-index: 10; }
+.download-menu-heading { margin: 7px 10px 9px; font-size: 9px; font-weight: 600; letter-spacing: 1.4px; color: #87949f; }
+.download-option { display: flex; align-items: center; width: 100%; gap: 11px; border: 0; border-radius: 7px; padding: 11px 9px; background: white; text-align: left; color: #2b4358; }
+.download-option:hover, .download-option:focus-visible { background: #f0f5f9; }
+.format-badge { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 38px; border: 1px solid #dde6ed; border-radius: 5px; background: #f6f9fb; color: #52738e; font-size: 8px; font-weight: 700; letter-spacing: .3px; }
+.download-option strong { display: block; font-size: 12px; font-weight: 600; }
+.download-option small { display: block; font-size: 10px; color: #7a8a96; margin-top: 4px; }
+.option-arrow { margin-left: auto; font-size: 15px; color: #8da1b0; }
+@media (max-width: 720px) { .download-menu { left: 0; right: auto; max-width: calc(100vw - 85px); } }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
