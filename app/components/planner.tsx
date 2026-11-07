@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import CourseDetails from "./course-details";
 import Link from "next/link";
 import { downloadPlan, downloadPlanPng, printPlan } from "../lib/download-plan";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -10,6 +11,7 @@ import { meeting, overlaps, searchCourses, time, type Course } from "../lib/cour
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default function Planner() {
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
   const [query, setQuery] = useState("");
   const savedPlan = useSyncExternalStore<string | null | undefined>(subscribePlan, readPlan, serverPlan);
   const selected = useMemo(() => restoreCourses(savedPlan ?? null), [savedPlan]);
@@ -68,7 +70,7 @@ export default function Planner() {
               <ul className="course-results">
                 {results.map((course) => {
                   const added = selected.some((item) => item.crn === course.crn);
-                  return <li key={course.crn} className="course-result"><div><span className={`course-code ${course.color}`}>{course.code}</span><h3>{course.title}</h3><p>{meeting(course)}</p><p>CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}</p></div><button className="add-button" disabled={loading || added} aria-label={added ? `${course.code} already added` : `Add ${course.code}: ${course.title}`} onClick={() => add(course)}>{added ? "✓" : "+"}</button></li>;
+                  return <li key={course.crn} className="course-result"><button className="course-detail-trigger search-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><span className={`course-code ${course.color}`}>{course.code}</span><span className="result-title">{course.title}</span><span className="result-meta">{meeting(course)}</span><span className="result-meta">CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}<span className="details-hint">View details ↗</span></span></button><button className="add-button" disabled={loading || added} aria-label={added ? `${course.code} already added` : `Add ${course.code}: ${course.title}`} onClick={() => add(course)}>{added ? "✓" : "+"}</button></li>;
                 })}
               </ul>
               {results.length === 0 && <div className="no-results"><h3>No matching courses</h3><p>Try a broader subject, a course title, or a CRN.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
@@ -78,7 +80,7 @@ export default function Planner() {
               {loading ? <div className="plan-loading" role="status"><span className="loading-bar" /><span className="loading-bar" />Restoring your saved plan…</div> : <>
               <p className="save-status" role="status">{saveError ? "Could not save in this browser. Your changes will last for this session only." : "Auto-save enabled · This browser only"}</p>
               <div className="plan-totals"><strong>{selected.length} courses</strong><span>Credits unavailable</span></div>
-              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><div><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}</div><button aria-label={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></li>)}</ul>}
+              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><button className="course-detail-trigger selected-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}<span className="details-hint">View details ↗</span></button><button aria-label={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></li>)}</ul>}
               </>}
               <p className="sr-only" role="status">{notice}</p>
             </section>
@@ -129,7 +131,7 @@ export default function Planner() {
                     });
                     return dayEvents.map((course) => {
                       const laneIndex = lanes.findIndex((lane) => lane.includes(course));
-                      return <div key={course.eventId} className={`calendar-event ${course.color}`} style={{ top: course.start - 480, height: course.end - course.start, left: `calc(${laneIndex * 100 / lanes.length}% + 3px)`, width: `calc(${100 / lanes.length}% - 6px)` }}><strong>{course.code}{course.type === "LAB" ? " · Lab" : ""}</strong><span>{time(course.start)}–{time(course.end)}</span><span className="event-title">{course.title} · {course.crn}</span><button className="event-remove" aria-label={`Remove ${course.code} from your plan`} title={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></div>;
+                      return <div key={course.eventId} className={`calendar-event ${course.color}`} style={{ top: course.start - 480, height: course.end - course.start, left: `calc(${laneIndex * 100 / lanes.length}% + 3px)`, width: `calc(${100 / lanes.length}% - 6px)` }}><button className="event-details-button" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><strong>{course.code}{course.type === "LAB" ? " · Lab" : ""}</strong><span>{time(course.start)}–{time(course.end)}</span><span className="event-title">{course.title} · {course.crn}</span></button><button className="event-remove" aria-label={`Remove ${course.code} from your plan`} title={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></div>;
                     });
                   })()}
                 </div>)}
@@ -142,6 +144,7 @@ export default function Planner() {
         </div>
         <footer className="page-footer"><span>Adaptive Course Planner · Made for your next chapter.</span><nav aria-label="More pages"><Link href="/planner">Registrar planner</Link></nav></footer>
       </main>
+      {detailCourse && <CourseDetails course={detailCourse} onClose={() => setDetailCourse(null)} />}
     </>
   );
 }

@@ -49,3 +49,5 @@ Use **Download planner** to save a standalone HTML document with a weekday overv
 Export options: **Save as PDF** opens the browser print dialog (choose Save as PDF), **Download PNG** creates an image with the weekday agenda and full course list, and **HTML** downloads an offline document. PNG includes class/lab meetings and TBA sections; unusually large plans should use PDF.
 
 Choose PDF, PNG, or HTML from the **Download planner** dropdown. It is disabled while restoring a plan, when the plan is empty, or while an image is being generated.
+
+Click a search result, a selected course, or a calendar block to view a compact details dialog with instructors, prerequisites, permission requirements, and class-year restrictions from the imported catalog. Missing requirements are labeled "None listed" rather than interpreted as confirmed eligibility. Escape, the close button, or the backdrop dismisses the dialog.
