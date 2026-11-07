@@ -79,7 +79,7 @@ export default function Planner() {
             <div className="schedule-footer"><span className="legend-dot" /> Courses appear as you add them <span>{selected.length ? `${selected.length} courses in your plan` : "Let’s build your week"}</span></div>
           </section>
         </div>
-        <footer className="page-footer"><span>Adaptive Course Planner · Made for your next chapter.</span><nav aria-label="Team pages"><Link href="/planner">Registrar planner</Link><span>Team workspace</span><Link href="/alex">Alex</Link><Link href="/jason">Jason</Link><Link href="/wesley">Wesley</Link></nav></footer>
+        <footer className="page-footer"><span>Adaptive Course Planner · Made for your next chapter.</span><nav aria-label="More pages"><Link href="/planner">Registrar planner</Link></nav></footer>
       </main>
     </>
   );
