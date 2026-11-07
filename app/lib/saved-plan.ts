@@ -53,5 +53,5 @@ export function subscribePlan(onChange: () => void) {
   };
 }
 
-// Match the server-rendered empty plan until the browser hydrates.
-export function serverPlan() { return null; }
+// Unknown until hydration: show a loading state, never an incorrect empty plan.
+export function serverPlan(): undefined { return undefined; }
