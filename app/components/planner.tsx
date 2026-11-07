@@ -148,7 +148,6 @@ export default function Planner() {
           <div className="footer-info">
             <p>Adaptive Course Planner</p>
             <p>Spring 2027 schedule · Built by F&amp;M students</p>
-            <nav aria-label="More pages"><Link href="/planner">Registrar planner</Link></nav>
             <p className="footer-motto">Lux et Lex</p>
             <p className="footer-note">A student project for planning only. Not an official Franklin &amp; Marshall College website and does not register you for courses.</p>
           </div>
