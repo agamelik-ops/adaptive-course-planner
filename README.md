@@ -51,3 +51,21 @@ Export options: **Save as PDF** opens the browser print dialog (choose Save as P
 Choose PDF, PNG, or HTML from the **Download planner** dropdown. It is disabled while restoring a plan, when the plan is empty, or while an image is being generated.
 
 Click a search result, a selected course, or a calendar block to view a compact details dialog with instructors, prerequisites, permission requirements, and class-year restrictions from the imported catalog. Missing requirements are labeled "None listed" rather than interpreted as confirmed eligibility. Escape, the close button, or the backdrop dismisses the dialog.
+
+## Automatic seat availability (extension prototype)
+
+1. Run `npm run dev` at **http://localhost:3000**.
+2. Load the repo's `extension` folder in Chrome's `chrome://extensions` Developer mode. Reload it after source changes and review Chrome's permissions prompt yourself. Refresh localhost so the updated bridge loads.
+3. Click the extension → **Connect to F&M**, from any page. Accept the optional F&M registration-site access prompt to enable the connection. The extension opens its own Browse Classes tab.
+4. Sign in and select **Spring 2027** there if prompted. Once that semester is ready, importing starts automatically. No scrolling, manual page changes, or second extension click is needed. It refreshes all subjects about every **5 minutes** while that tab stays open and signed in. Each pass clears search filters; use a separate tab for your own registration browsing.
+5. **Disconnect** stops future passes and cancels an in-progress pass. Closing or leaving the registration tab, restarting Chrome, or a scan/session error pauses automatic updates. Click Connect to F&M again to reconnect.
+
+Search results, selected courses, and course details show separate **Seats available** and **Waitlist seats left** bars: remaining seats divided by capacity. Full, unknown, zero-capacity, and reserved-seat conditions remain explicit. “Last checked” is specific to each section. The planner shows periodic-update status and marks overdue status as paused; it never promises an instant live feed. Browser sleep or scheduling may delay checks.
+
+Full sync verifies that unique CRNs collected match Banner's unfiltered section count before claiming completion. It requests up to 50 rows per normal results page, sequentially, and stops on repeated pages, unsupported terms, or timeouts. Failed/cancelled passes preserve partial snapshots without claiming completeness. The former current-page import option has been removed.
+
+Matching uses Banner's observed Spring 2027 term code `202620` and CRN. Other terms are rejected. All Banner sections are scanned, including ones missing from our PDF-based catalog; only existing matching catalog CRNs can be shown in the planner. Syncing availability does not add missing courses, guarantee eligibility, or register anyone.
+
+The extension stores only CRNs, displayed seat status, timestamps, and local scheduling metadata. It does not collect passwords, cookies, holds, or account details. Optional host access to `https://prd-reg9.fandm.edu/*` lets the extension open its own registration tab and resume after sign-in; `scripting` performs the user-authorized page interaction, `storage` keeps snapshots, and `alarms` schedules refreshes. The localhost content script delivers snapshots and update status to the planner. The existing course-schedule redirect is preserved. A hosted planner needs its own explicitly configured origin.
+
+Checks: `node --test scripts/availability.test.mjs`, `npm run lint`, and `npx tsc --noEmit`. Reload and test the updated extension in Chrome as well; fixture tests do not verify a real signed-in session or scheduled browser wakeups.

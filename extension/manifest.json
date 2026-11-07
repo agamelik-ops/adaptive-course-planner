@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "F&M Adaptive Course Planner",
-  "version": "1.0.0",
-  "description": "Redirect the F&M course schedule to our planner.",
+  "version": "1.3.0",
+  "description": "Plan courses and import displayed Spring 2027 seat availability.",
   "action": {
-    "default_title": "Open Course Planner"
+    "default_title": "F&M Course Planner",
+    "default_popup": "popup.html"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -15,8 +17,28 @@
         "https://webapps.fandm.edu/courseschedule",
         "https://webapps.fandm.edu/courseschedule/*"
       ],
-      "js": ["redirect.js"],
+      "js": [
+        "redirect.js"
+      ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://localhost:3000/*"
+      ],
+      "js": [
+        "planner-bridge.js"
+      ],
+      "run_at": "document_idle"
     }
+  ],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "alarms"
+  ],
+  "optional_host_permissions": [
+    "https://prd-reg9.fandm.edu/*"
   ]
 }

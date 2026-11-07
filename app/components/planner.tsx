@@ -2,6 +2,9 @@
 
 import Image from "next/image";
 import CourseDetails from "./course-details";
+import AvailabilityStatus from "./availability-status";
+import AutoUpdateStatus from "./auto-update-status";
+import { parseAvailability, readAvailability, serverAvailability, subscribeAvailability } from "../lib/availability";
 import Link from "next/link";
 import { downloadPlan, downloadPlanPng, printPlan } from "../lib/download-plan";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -12,6 +15,8 @@ const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default function Planner() {
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  const availabilitySnapshot = useSyncExternalStore(subscribeAvailability, readAvailability, serverAvailability);
+  const availability = useMemo(() => parseAvailability(availabilitySnapshot), [availabilitySnapshot]);
   const [query, setQuery] = useState("");
   const savedPlan = useSyncExternalStore<string | null | undefined>(subscribePlan, readPlan, serverPlan);
   const selected = useMemo(() => restoreCourses(savedPlan ?? null), [savedPlan]);
@@ -59,6 +64,7 @@ export default function Planner() {
       <main className="planner-shell">
         <div className="page-heading"><div><h1>Make room for what’s next.</h1><p>Find your classes. Build your week. See the possibilities.</p></div><span className="demo-badge">Spring 2027</span></div>
         <p className="demo-note">Courses from the imported Spring 2027 master schedule. Planning does not register you or confirm seat availability. Your plan saves automatically in this browser for Spring 2027.</p>
+        <div className="availability-guide"><strong>Seat availability</strong><AutoUpdateStatus /><p>Click “Connect to F&M” in the extension. It opens the registration page and imports all Spring 2027 availability for you. Sign in and select Spring 2027 if prompted—no scrolling or paging needed. Keep the F&M tab open for automatic updates every 5 minutes.</p><a href="https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch" target="_blank" rel="noreferrer">Open Browse Classes ↗</a></div>
         <div className="planner-layout">
           <aside className="sidebar">
             <section className="panel search-panel" aria-labelledby="find-heading">
@@ -69,7 +75,7 @@ export default function Planner() {
               <ul className="course-results">
                 {results.map((course) => {
                   const added = selected.some((item) => item.crn === course.crn);
-                  return <li key={course.crn} className="course-result"><button className="course-detail-trigger search-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><span className={`course-code ${course.color}`}>{course.code}</span><span className="result-title">{course.title}</span><span className="result-meta">{meeting(course)}</span><span className="result-meta">CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}<span className="details-hint">View details ↗</span></span></button><button className="add-button" disabled={loading || added} aria-label={added ? `${course.code} already added` : `Add ${course.code}: ${course.title}`} onClick={() => add(course)}>{added ? "✓" : "+"}</button></li>;
+                  return <li key={course.crn} className="course-result"><button className="course-detail-trigger search-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><span className={`course-code ${course.color}`}>{course.code}</span><span className="result-title">{course.title}</span><span className="result-meta">{meeting(course)}</span><span className="result-meta">CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}<AvailabilityStatus record={availability[course.crn]} /><span className="details-hint">View details ↗</span></span></button><button className="add-button" disabled={loading || added} aria-label={added ? `${course.code} already added` : `Add ${course.code}: ${course.title}`} onClick={() => add(course)}>{added ? "✓" : "+"}</button></li>;
                 })}
               </ul>
               {results.length === 0 && <div className="no-results"><h3>No matching courses</h3><p>Try a broader subject, a course title, or a CRN.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
@@ -79,7 +85,7 @@ export default function Planner() {
               {loading ? <div className="plan-loading" role="status"><span className="loading-bar" /><span className="loading-bar" />Restoring your saved plan…</div> : <>
               <p className="save-status" role="status">{saveError ? "Could not save in this browser. Your changes will last for this session only." : "Auto-save enabled · This browser only"}</p>
               <div className="plan-totals"><strong>{selected.length} courses</strong><span>Credits unavailable</span></div>
-              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><button className="course-detail-trigger selected-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}<span className="details-hint">View details ↗</span></button><button aria-label={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></li>)}</ul>}
+              {selected.length === 0 ? <p className="empty-selection">Your week is a blank canvas. Add a course above to get started.</p> : <ul className="selected-list">{selected.map((course) => <li key={course.crn} className={`selected-course ${course.color}`}><button className="course-detail-trigger selected-detail-trigger" aria-label={`View details for ${course.code}, CRN ${course.crn}`} onClick={() => setDetailCourse(course)}><strong>{course.code} · {course.crn}</strong><span>{course.title}</span>{course.meetings.length === 0 && <span>Meeting time TBA</span>}<AvailabilityStatus record={availability[course.crn]} /><span className="details-hint">View details ↗</span></button><button aria-label={`Remove ${course.code}`} onClick={() => remove(course)}>×</button></li>)}</ul>}
               </>}
               <p className="sr-only" role="status">{notice}</p>
             </section>
@@ -154,7 +160,7 @@ export default function Planner() {
           </div>
         </div>
       </footer>
-      {detailCourse && <CourseDetails course={detailCourse} onClose={() => setDetailCourse(null)} />}
+      {detailCourse && <CourseDetails availability={availability[detailCourse.crn]} course={detailCourse} onClose={() => setDetailCourse(null)} />}
     </>
   );
 }
