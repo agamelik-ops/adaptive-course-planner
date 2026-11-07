@@ -78,10 +78,10 @@ export default function Planner() {
       const times = c.meetings
         .map(
           (m) =>
-            `${m.days.join("/")} ${formatTime(m.start)}–${formatTime(m.end)}`,
+            `${m.type === "LAB" ? "Lab " : ""}${m.days.join("/")} ${formatTime(m.start)}–${formatTime(m.end)}`,
         )
         .join("; ");
-      return `${c.code} (CRN ${c.crn}) – ${c.title}\n  ${times}, ${c.location}`;
+      return `${c.code}${c.section ? ` ${c.section}` : ""} (CRN ${c.crn}) – ${c.title}\n  ${times || "Time TBA"}\n  ${c.instructors.join("; ")}`;
     })
     .join("\n\n");
   const mailto = `mailto:?subject=${encodeURIComponent(
@@ -119,7 +119,7 @@ export default function Planner() {
                   id="crn"
                   value={crn}
                   onChange={(e) => setCrn(e.target.value)}
-                  placeholder="ex: 10060"
+                  placeholder="ex: 20373"
                   inputMode="numeric"
                   className="w-full rounded-l border border-gray-300 bg-white px-4 py-2 outline-none focus:border-[#213a6b]"
                 />
@@ -133,7 +133,7 @@ export default function Planner() {
               </div>
               {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
               <p className="mt-2 text-xs text-gray-500">
-                Sample CRNs: 10060–10066
+                Spring 2027 schedule
               </p>
             </form>
 
@@ -148,9 +148,17 @@ export default function Planner() {
                   className={`flex items-start justify-between rounded border-l-4 px-3 py-2 ${COLORS[i % COLORS.length]}`}
                 >
                   <div>
-                    <div className="font-bold">{c.code}</div>
+                    <div className="font-bold">
+                      {c.code}
+                      {c.section && ` ${c.section}`}
+                    </div>
                     <div className="text-sm">{c.title}</div>
-                    <div className="text-xs opacity-75">CRN {c.crn}</div>
+                    <div className="text-xs opacity-75">
+                      CRN {c.crn} · {c.instructors.join(", ")}
+                    </div>
+                    {c.meetings.length === 0 && (
+                      <div className="text-xs font-semibold">Time TBA</div>
+                    )}
                   </div>
                   <button
                     onClick={() => removeCourse(c.crn)}
@@ -240,7 +248,9 @@ export default function Planner() {
                               <div>
                                 {formatTime(m.start)}–{formatTime(m.end)}
                               </div>
-                              <div className="opacity-75">{c.location}</div>
+                              {m.type === "LAB" && (
+                                <div className="opacity-75">Lab</div>
+                              )}
                             </div>
                           );
                         }),
