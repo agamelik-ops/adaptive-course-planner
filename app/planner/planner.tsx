@@ -514,9 +514,9 @@ export default function Planner() {
 
             {calendarInstructions && (
               <div
+                className="calendar-export-guide"
                 role="status"
                 style={{
-                  margin: "16px 0",
                   padding: "16px",
                   border: "1px solid #cbd5e1",
                   borderRadius: "8px",
