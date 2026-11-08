@@ -43,18 +43,20 @@ function shortDate(iso: string) {
 
 function summaryText(audit: DegreeAudit, summary: AuditSummary) {
   const lines = [`Here’s what your Degree Works audit (checked ${shortDate(audit.checkedAt)}) shows:`];
+  if (audit.profile?.major) lines.push(`Major: ${audit.profile.major}${audit.profile.minor ? ` · Minor: ${audit.profile.minor}` : ""}`);
+  if (audit.courses?.length) lines.push(`${audit.courses.filter((course) => course.status === "completed").length} completed course records · ${audit.courses.filter((course) => course.status === "in-progress").length} in progress or preregistered.`);
   if (summary.open.length) {
     lines.push("", "Still needed:");
     for (const need of summary.open) {
       lines.push(`• ${need.label}${need.kind === "major" && need.sources.some((s) => /not declared/i.test(s)) ? " — you haven’t declared a major yet" : ""}`);
     }
   } else {
-    lines.push("", "Nothing is marked incomplete. Nice work!");
+    lines.push("", "No recognized requirements are marked incomplete in this import.");
   }
   if (summary.inProgress.length) lines.push("", `On track once your current classes finish: ${summary.inProgress.map((need) => need.label).join(", ")}.`);
   if (summary.complete.length) lines.push("", `Done: ${summary.complete.map((need) => need.label).join(", ")}.`);
   if (summary.open.some((need) => need.kind === "connections")) lines.push("", "Connections seminars aren’t in the Spring schedule, so check with your adviser about that one.");
-  if (audit.partial) lines.push("", "This audit may be partial: only sections that were open in Degree Works get imported.");
+  if (audit.partial) lines.push("", "This is a worksheet snapshot and may omit requirements or exceptions. Confirm your remaining requirements with your adviser.");
   return lines.join("\n");
 }
 
@@ -108,6 +110,7 @@ export default function ChatWidget() {
   function context(nextPrefs: Prefs, list = suggestions): AdvisorContext {
     return {
       plan: currentPlan(),
+      academicCourses: audit?.courses,
       pending: list.filter((item) => item.status === "pending").map((item) => item.course),
       rejected: new Set(list.filter((item) => item.status === "rejected").map((item) => item.course.crn)),
       classYear: nextPrefs.classYear,
@@ -129,7 +132,7 @@ export default function ChatWidget() {
       askNext({}, current);
     } else {
       say(
-        "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, expand the sections, and click the F&M Course Planner extension. It’ll bring the audit here automatically.\n\nNo extension? You can paste the audit data instead.",
+        "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, click the F&M Course Planner extension, then “Import Degree Works.” Review the preview and confirm the import.\n\nNo extension? You can paste the audit data instead.",
         [{ label: "Paste audit data", action: { type: "paste" } }],
       );
     }
@@ -311,7 +314,7 @@ export default function ChatWidget() {
             <div className="chat-avatar" aria-hidden="true">✦</div>
             <div>
               <strong>Planning Assistant</strong>
-              <span>{audit ? `Degree Works audit loaded · ${audit.requirements.length} requirements` : "Spring 2027 course advisor"}</span>
+              <span>{audit ? "Degree Works linked · Saved academic history" : "Spring 2027 course advisor"}</span>
             </div>
             <button className="chat-close" aria-label="Close chat" onClick={() => setOpen(false)}>×</button>
           </header>

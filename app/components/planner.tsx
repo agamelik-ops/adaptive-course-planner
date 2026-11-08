@@ -83,7 +83,7 @@ export default function Planner() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
-  const [calendarInstructions, setCalendarInstructions] = useState("");
+  const [calendarMessage, setCalendarMessage] = useState("");
   const [notice, setNotice] = useState("");
 
   const downloadRef = useRef<HTMLDivElement>(null);
@@ -112,6 +112,27 @@ export default function Planner() {
   );
 
   const loading = savedPlan === undefined;
+
+  // Preserve the availability sync's list of planned course identifiers.
+  useEffect(() => {
+    if (savedPlan === undefined) return;
+
+    try {
+      const identifiers = selected.map((course) => ({
+        crn: course.crn,
+        number: course.code.split(/\s+/)[1]
+      }));
+
+      localStorage.setItem(
+        "fm-availability-plan:202620",
+        JSON.stringify(identifiers)
+      );
+    } catch {
+      return;
+    }
+
+    window.dispatchEvent(new Event("fm-availability-plan-change"));
+  }, [selected, savedPlan]);
 
   useEffect(() => {
     if (!downloadOpen) return;
@@ -148,7 +169,7 @@ export default function Planner() {
 
   function updatePlan(next: Course[]) {
     setSaveError(!savePlan(next));
-    setCalendarInstructions("");
+    setCalendarMessage("");
   }
 
   function add(course: Course) {
@@ -167,7 +188,7 @@ export default function Planner() {
     setDownloadOpen(false);
     downloadButtonRef.current?.focus();
     setExportError("");
-    setCalendarInstructions("");
+    setCalendarMessage("");
 
     try {
       if (format === "pdf") {
@@ -180,13 +201,10 @@ export default function Planner() {
       } else if (format === "ics") {
         const result = downloadCalendar(selected);
 
-        setCalendarInstructions(
-          "Calendar downloaded. In Google Calendar on a computer, open " +
-          "Settings → Import & export → Import. Select fm-spring-2027.ics " +
-          "and choose the calendar to import into." +
-          (result.skipped.length
-            ? ` TBA courses skipped: ${result.skipped.join(", ")}.`
-            : "")
+        setCalendarMessage(
+          result.skipped.length
+            ? `TBA courses skipped: ${result.skipped.join(", ")}.`
+            : "Your scheduled class meetings have been exported."
         );
       } else {
         downloadPlan(selected);
@@ -247,9 +265,11 @@ export default function Planner() {
           <AutoUpdateStatus />
           <p>
             Click “Connect to F&amp;M” in the extension. It opens the
-            registration page and imports Spring 2027 availability.
-            Sign in and select Spring 2027 if prompted. Keep the
-            F&amp;M tab open for automatic updates every 5 minutes.
+            registration page and imports all Spring 2027 availability
+            for you. Sign in and select Spring 2027 if prompted—no
+            scrolling or paging needed. Keep the F&amp;M tab open for
+            automatic updates (planned courses every 5 minutes; full
+            catalog every 30 minutes).
           </p>
           <a
             href="https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch"
@@ -280,7 +300,7 @@ export default function Planner() {
                 <input
                   id="course-search"
                   type="search"
-                  placeholder="Try Spanish, CPS 111, or a CRN"
+                  placeholder="Try Spanish, language, CPS 111, or a CRN"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />
@@ -378,8 +398,8 @@ export default function Planner() {
 
                   {selected.length === 0 ? (
                     <p className="empty-selection">
-                      Your week is a blank canvas. Add a course above to get
-                      started.
+                      Your week is a blank canvas. Add a course above
+                      to get started.
                     </p>
                   ) : (
                     <ul className="selected-list">
@@ -403,7 +423,9 @@ export default function Planner() {
                             <AvailabilityStatus
                               record={availability[course.crn]}
                             />
-                            <span className="details-hint">View details ↗</span>
+                            <span className="details-hint">
+                              View details ↗
+                            </span>
                           </button>
 
                           <button
@@ -524,64 +546,77 @@ export default function Planner() {
               </p>
             )}
 
-            {calendarInstructions && (
-  <div
-    role="status"
-    style={{
-      margin: "16px 0",
-      padding: "18px 20px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "10px",
-      background: "#f0f7ff",
-      color: "#213a6b",
-      fontSize: "14px",
-      lineHeight: 1.6
-    }}
-  >
-    <h3 style={{ margin: "0 0 10px", fontSize: "17px" }}>
-      Your calendar file is ready
-    </h3>
+            {calendarMessage && (
+              <div
+                role="status"
+                style={{
+                  margin: "16px 0",
+                  padding: "18px 20px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  background: "#f0f7ff",
+                  color: "#213a6b",
+                  fontSize: "14px",
+                  lineHeight: 1.6
+                }}
+              >
+                <h3 style={{ margin: "0 0 10px", fontSize: "17px" }}>
+                  Your calendar file is ready
+                </h3>
 
-    <ol style={{ margin: "0 0 12px", paddingLeft: "22px" }}>
-      <li>Open Google Calendar on your computer.</li>
-      <li>
-        Go to <strong>Settings → Import &amp; export → Import</strong>.
-      </li>
-      <li>
-        Select <strong>fm-spring-2027.ics</strong>, choose a calendar,
-        and click <strong>Import</strong>.
-      </li>
-    </ol>
+                <ol
+                  style={{
+                    margin: "0 0 12px",
+                    paddingLeft: "22px",
+                    listStyleType: "decimal"
+                  }}
+                >
+                  <li>Open Google Calendar on your computer.</li>
+                  <li>
+                    Go to{" "}
+                    <strong>
+                      Settings → Import &amp; export → Import
+                    </strong>.
+                  </li>
+                  <li>
+                    Select <strong>fm-spring-2027.ics</strong>,
+                    choose a calendar, and click <strong>Import</strong>.
+                  </li>
+                </ol>
 
-    <p style={{ margin: "0 0 8px", color: "#52647a" }}>
-      Includes scheduled classes from January 19–April 29, 2027.
-      Excludes spring recess and exams. TBA courses are skipped.
-    </p>
+                <p style={{ margin: "0 0 8px", color: "#52647a" }}>
+                  {calendarMessage}
+                </p>
 
-    <p style={{ margin: "0 0 14px", color: "#52647a" }}>
-      Changes won’t sync automatically. Use a separate calendar so
-      you can replace your schedule later.
-    </p>
+                <p style={{ margin: "0 0 8px", color: "#52647a" }}>
+                  Includes scheduled classes from January 19–April 29,
+                  2027. Excludes spring recess and exams.
+                </p>
 
-    <a
-      href="https://calendar.google.com/"
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        display: "inline-block",
-        padding: "8px 14px",
-        borderRadius: "6px",
-        background: "#213a6b",
-        color: "#fff",
-        fontSize: "14px",
-        fontWeight: 600,
-        textDecoration: "none"
-      }}
-    >
-      Open Google Calendar ↗
-    </a>
-  </div>
-)}
+                <p style={{ margin: "0 0 14px", color: "#52647a" }}>
+                  Changes won’t sync automatically. Use a separate
+                  calendar so you can replace your schedule later.
+                </p>
+
+                <a
+                  href="https://calendar.google.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    padding: "8px 14px",
+                    borderRadius: "6px",
+                    background: "#213a6b",
+                    color: "#fff",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    textDecoration: "none"
+                  }}
+                >
+                  Open Google Calendar ↗
+                </a>
+              </div>
+            )}
 
             {conflicts.length > 0 && (
               <div className="conflict-note" role="status">

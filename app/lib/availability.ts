@@ -3,6 +3,7 @@ export type Availability = {
   crn: string;
   status: string;
   checkedAt: string;
+  changedAt: string | null;
   seats: number | null;
   capacity: number | null;
   waitlist: number | null;
@@ -25,7 +26,7 @@ export function parseAvailability(raw: string | null): Record<string, Availabili
       const capacity = seatMatch ? Number(seatMatch[2]) : null;
       if (waitMatch && Number(waitMatch[1]) > Number(waitMatch[2])) continue;
       if (seats !== null && capacity !== null && seats > capacity) continue;
-      result[row.crn] = { crn: row.crn, status: row.status, checkedAt: row.checkedAt, seats, capacity,
+      result[row.crn] = { crn: row.crn, status: row.status, checkedAt: row.checkedAt, changedAt: typeof row.changedAt === "string" && Number.isFinite(Date.parse(row.changedAt)) && Date.parse(row.changedAt) <= stamp ? row.changedAt : null, seats, capacity,
         waitlist: waitMatch ? Number(waitMatch[1]) : null, waitlistCapacity: waitMatch ? Number(waitMatch[2]) : null, reserved: /reserved|waitlisted only/i.test(row.status) };
     }
   } catch { /* Missing or invalid imported data stays unknown. */ }
@@ -61,7 +62,7 @@ export function autoUpdateLabel(raw: string | null, now: number) {
     if (!state?.enabled) return "Updates paused · Saved availability only";
     if (state.state === "connecting") return "Connecting to F&M · Complete sign-in or select Spring 2027 in the opened tab";
     if (state.state === "syncing") return now - state.updatedAt > 120000 ? "Updates paused · Reconnect Browse Classes" : "Refreshing availability…";
-    if (state.state === "waiting" && typeof state.nextCheckAt === "number" && now <= state.nextCheckAt + 60000) return "Automatic updates on · Every 5 minutes";
+    if (state.state === "waiting" && typeof state.nextCheckAt === "number" && now <= state.nextCheckAt + 60000) return "Automatic updates on · Plan every 5 minutes · Catalog every 30 minutes";
   } catch { /* Unknown state stays paused. */ }
   return "Updates paused · Reconnect Browse Classes";
 }

@@ -3,13 +3,23 @@
 // window.postMessage; it can also be pasted into the chat as JSON.
 
 export type RequirementStatus = "complete" | "in-progress" | "incomplete" | "unknown";
-export type Requirement = { name: string; status: RequirementStatus };
+export type Requirement = { name: string; status: RequirementStatus; block?: string; details?: string };
+export type AcademicCourse = {
+  code: string; title: string; grade: string; term: string; credits: number | null;
+  status: "completed" | "in-progress" | "not-completed" | "unknown";
+  blocks: string[];
+};
+export type AcademicProfile = Partial<Record<"degree" | "major" | "minor" | "concentration" | "earnedCredits" | "languagePlacement" | "mathPlacement" | "graduationYear", string>>;
 export type DegreeAudit = {
   version: number;
   checkedAt: string;
   source: string;
   partial: boolean;
   requirements: Requirement[];
+  profile?: AcademicProfile;
+  courses?: AcademicCourse[];
+  blocks?: { name: string; catalogYear?: string }[];
+  warnings?: string[];
 };
 
 const AUDIT_KEY = "fm-course-planner:degree-audit:v1";
@@ -24,12 +34,38 @@ export function parseAudit(value: unknown): DegreeAudit | null {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<DegreeAudit>;
   if (!Array.isArray(candidate.requirements)) return null;
-  const requirements = candidate.requirements
+  const text = (value: unknown, max = 500) => typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
+  const requirements = candidate.requirements.slice(0, 2000)
     .filter((item): item is Requirement =>
       !!item && typeof item.name === "string" && STATUSES.has(item.status as RequirementStatus))
-    .map((item) => ({ name: item.name.replace(/\s+/g, " ").trim(), status: item.status }));
+    .map((item) => ({ name: text(item.name), status: item.status, block: text(item.block), details: text(item.details, 4000) })).filter((item) => item.name);
   if (requirements.length === 0) return null;
+  const profile: AcademicProfile = {};
+  for (const key of ["degree", "major", "minor", "concentration", "earnedCredits", "languagePlacement", "mathPlacement", "graduationYear"] as const) {
+    const value = text(candidate.profile?.[key]);
+    if (value) profile[key] = value;
+  }
+  const courses: AcademicCourse[] = [];
+  const seen = new Set<string>();
+  for (const row of (Array.isArray(candidate.courses) ? candidate.courses.slice(0, 2000) : [])) {
+    if (!row || typeof row !== "object") continue;
+    const code = text(row.code).toUpperCase();
+    const term = text(row.term);
+    if (!/^[A-Z]{2,5}\s+\d{2,4}[A-Z]?$/.test(code) || !term) continue;
+    const grade = text(row.grade);
+    const id = `${code}|${term}|${grade}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    courses.push({ code, term, grade, title: text(row.title),
+      credits: typeof row.credits === "number" && Number.isFinite(row.credits) && row.credits >= 0 ? row.credits : null,
+      status: ["completed", "in-progress", "not-completed", "unknown"].includes(row.status) ? row.status : "unknown",
+      blocks: Array.isArray(row.blocks) ? row.blocks.slice(0, 50).map((block: unknown) => text(block)).filter(Boolean) : [],
+    });
+  }
   return {
+    profile, courses,
+    blocks: Array.isArray(candidate.blocks) ? candidate.blocks.slice(0, 100).filter((block) => block && typeof block.name === "string").map((block) => ({ name: text(block.name), catalogYear: text(block.catalogYear) })) : [],
+    warnings: Array.isArray(candidate.warnings) ? candidate.warnings.slice(0, 30).map((warning) => text(warning)).filter(Boolean) : [],
     version: typeof candidate.version === "number" ? candidate.version : 1,
     checkedAt: typeof candidate.checkedAt === "string" ? candidate.checkedAt : new Date().toISOString(),
     source: typeof candidate.source === "string" ? candidate.source : "Degree Works",
