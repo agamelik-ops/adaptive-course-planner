@@ -27,7 +27,8 @@
         "http://localhost:3000/*"
       ],
       "js": [
-        "planner-bridge.js"
+        "planner-bridge.js",
+        "bridge.js"
       ],
       "run_at": "document_idle"
     }

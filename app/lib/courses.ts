@@ -13,9 +13,10 @@ export type Course = {
   prereq: string;
   permission: boolean;
   closedTo: string[];
+  dist: string[]; // gen-ed / program tags from the schedule, e.g. ["NATL", "WRLD"]
 };
 
-const subjects: Record<string, string> = {
+export const subjects: Record<string, string> = {
   AFS: "Africana Studies", AMS: "American Studies", ANT: "Anthropology",
   ART: "Art", AST: "Astronomy", BIO: "Biology", BOS: "Business Organizations and Society",
   CHM: "Chemistry", CHN: "Chinese", CLS: "Classics", CPS: "Computer Science",
@@ -43,7 +44,7 @@ export const courses: Course[] = COURSES.map((course) => {
     crn: course.crn, code: course.code, section: course.section,
     subject: subjects[prefix] ?? prefix, title: course.title,
     instructors: course.instructors, prereq: course.prereq,
-    permission: course.permission, closedTo: course.closedTo,
+    permission: course.permission, closedTo: course.closedTo, dist: course.dist,
     color: colors[Object.keys(subjects).indexOf(prefix) % colors.length] ?? "blue",
     meetings: course.meetings.map((item) => ({
       type: item.type, days: item.days.map((day) => dayNames.indexOf(day)).filter((day) => day >= 0),

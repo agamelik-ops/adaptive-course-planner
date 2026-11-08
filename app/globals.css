@@ -191,3 +191,32 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 @media (prefers-reduced-motion: reduce) { .seat-fill { transition: none; } }
 
 .selected-course .seat-fill { margin-top: 0; }
+
+/* Planning assistant: suggestion cards */
+.chat-panel { width: min(400px, calc(100vw - 32px)); }
+.chat-row { display: flex; flex-direction: column; gap: 8px; }
+.chat-row.user { align-items: flex-end; }
+.chat-row.assistant { align-items: flex-start; }
+.suggestion-card { width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #dde4ea; border-left: 4px solid #1f5fa8; border-radius: 10px; padding: 11px 12px; font-size: 12px; color: #2a3a47; transition: opacity 160ms ease, border-color 160ms ease; }
+.suggestion-card.accepted { border-left-color: #3f8a5c; background: #f4faf6; }
+.suggestion-card.rejected { opacity: .55; border-left-color: #b8c5ce; }
+.suggestion-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.suggestion-top strong { font-size: 13px; color: #173c64; }
+.suggestion-need { font-size: 10px; background: #eaf1f8; color: #1f5fa8; border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+.suggestion-title { margin: 4px 0 6px; font-weight: 600; }
+.suggestion-meta { margin: 0 0 3px; color: #6b7a86; font-size: 11px; }
+.suggestion-reason { margin: 7px 0 0; line-height: 1.4; }
+.suggestion-prereq { margin: 5px 0 0; font-size: 11px; color: #9a6b1f; }
+.suggestion-actions { display: flex; gap: 8px; margin-top: 10px; }
+.suggestion-actions button { flex: 1; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background 120ms ease, transform 120ms ease; }
+.suggestion-actions button:active { transform: scale(.97); }
+.suggestion-actions .accept { background: #1f5fa8; border: 1px solid #1f5fa8; color: #fff; }
+.suggestion-actions .accept:hover { background: #2a6dba; }
+.suggestion-actions .reject { background: #fff; border: 1px solid #c9d4dd; color: #4a5a66; }
+.suggestion-actions .reject:hover { background: #f3f5f7; }
+.suggestion-status { margin: 9px 0 0; font-weight: 700; font-size: 12px; }
+.suggestion-status.accepted { color: #3f8a5c; }
+.suggestion-status.rejected { color: #8a959e; }
+.chat-suggestions { flex-direction: row; flex-wrap: wrap; }
+.chat-launcher.has-audit::after { content: ""; position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; border-radius: 50%; background: #e0a526; border: 2px solid #fff; }
+.chat-launcher { position: relative; }
