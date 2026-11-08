@@ -45,6 +45,12 @@ function readContext(raw: Record<string, unknown> | undefined): StudentContext {
     plan,
     classYear: year && YEARS.has(year) ? (year as ClassYear) : undefined,
     expectedGraduation: text(raw?.expectedGraduation, 30),
+    declaredMajor: text(raw?.declaredMajor, 80),
+    languagePlacement: text(raw?.languagePlacement, 120),
+    mathPlacement: text(raw?.mathPlacement, 80),
+    takenCodes: (Array.isArray(raw?.takenCodes) ? raw.takenCodes : []).slice(0, 150)
+      .filter((code): code is string => typeof code === "string")
+      .map((code) => code.toUpperCase().trim()).filter((code) => /^[A-Z]{2,5} \d{2,4}[A-Z]?$/.test(code)),
     language: text(raw?.language, 40),
     major: text(raw?.major, 60),
     audit: audit ? { open: textList(audit.open), inProgress: textList(audit.inProgress), complete: textList(audit.complete) } : undefined,
@@ -76,6 +82,10 @@ function systemPrompt(ctx: StudentContext) {
   }
   lines.push(`- Class year for Spring 2027: ${ctx.classYear ?? "unknown"} (FR = first-year, SO = sophomore, JR = junior, SR = senior)`);
   if (ctx.expectedGraduation) lines.push(`- Expected graduation: ${ctx.expectedGraduation}`);
+  if (ctx.declaredMajor) lines.push(`- Declared major (Degree Works): ${ctx.declaredMajor}`);
+  if (ctx.languagePlacement) lines.push(`- Language placement results: ${ctx.languagePlacement}. Recommend the course level matching the placement (e.g. placement 102 means take 102 next).`);
+  if (ctx.mathPlacement) lines.push(`- Math placement: ${ctx.mathPlacement}`);
+  if (ctx.takenCodes?.length) lines.push(`- Already taken or in progress (don't recommend these): ${ctx.takenCodes.join(", ")}`);
   if (ctx.language) lines.push(`- Studying language: ${ctx.language}`);
   if (ctx.major) lines.push(`- Interested in majoring in: ${ctx.major}`);
   lines.push(ctx.plan.length

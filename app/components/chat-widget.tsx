@@ -62,18 +62,20 @@ function shortDate(iso: string) {
 
 function summaryText(audit: DegreeAudit, summary: AuditSummary) {
   const lines = [`Here’s what your Degree Works audit (checked ${shortDate(audit.checkedAt)}) shows:`];
+  if (audit.profile?.major) lines.push(`Major: ${audit.profile.major}${audit.profile.minor ? ` · Minor: ${audit.profile.minor}` : ""}`);
+  if (audit.courses?.length) lines.push(`${audit.courses.filter((course) => course.status === "completed").length} completed course records · ${audit.courses.filter((course) => course.status === "in-progress").length} in progress or preregistered.`);
   if (summary.open.length) {
     lines.push("", "Still needed:");
     for (const need of summary.open) {
       lines.push(`• ${need.label}${need.kind === "major" && need.sources.some((s) => /not declared/i.test(s)) ? " — you haven’t declared a major yet" : ""}`);
     }
   } else {
-    lines.push("", "Nothing is marked incomplete. Nice work!");
+    lines.push("", "No recognized requirements are marked incomplete in this import.");
   }
   if (summary.inProgress.length) lines.push("", `On track once your current classes finish: ${summary.inProgress.map((need) => need.label).join(", ")}.`);
   if (summary.complete.length) lines.push("", `Done: ${summary.complete.map((need) => need.label).join(", ")}.`);
   if (summary.open.some((need) => need.kind === "connections")) lines.push("", "Connections seminars aren’t in the Spring schedule, so check with your adviser about that one.");
-  if (audit.partial) lines.push("", "This audit may be partial: only sections that were open in Degree Works get imported.");
+  if (audit.partial) lines.push("", "This is a worksheet snapshot and may omit requirements or exceptions. Confirm your remaining requirements with your adviser.");
   return lines.join("\n");
 }
 
@@ -123,6 +125,7 @@ export default function ChatWidget() {
   function context(nextPrefs: Prefs, list = suggestions): AdvisorContext {
     return {
       plan: currentPlan(),
+      academicCourses: audit?.courses,
       pending: list.filter((item) => item.status === "pending").map((item) => item.course),
       rejected: new Set(list.filter((item) => item.status === "rejected").map((item) => item.course.crn)),
       classYear: nextPrefs.classYear,
@@ -144,7 +147,7 @@ export default function ChatWidget() {
       askNext(applyAuditYear(prefs, current), current);
     } else {
       say(
-        "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, expand the sections, and click the F&M Course Planner extension. It’ll bring the audit here automatically.\n\nNo extension? You can paste the audit data instead.",
+        "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, click the F&M Course Planner extension, then “Import Degree Works.” Review the preview and confirm the import.\n\nNo extension? You can paste the audit data instead.",
         [{ label: "Paste audit data", action: { type: "paste" } }],
       );
     }
@@ -157,7 +160,7 @@ export default function ChatWidget() {
     const next = { ...base, classYear: detected };
     setPrefs(next);
     const label = YEARS.find((year) => year.value === detected)?.label.toLowerCase() ?? detected;
-    const grad = current.student?.expectedGraduation;
+    const grad = current.profile?.graduationYear;
     say(`From Degree Works, I see you’re a ${label}${grad ? ` (expected graduation ${grad})` : ""}. If that’s not right, just tell me your class year.`);
     return next;
   }
@@ -353,9 +356,14 @@ export default function ChatWidget() {
     return {
       planCrns: currentPlan().map((course) => course.crn),
       classYear: prefs.classYear,
-      expectedGraduation: audit?.student?.expectedGraduation,
+      expectedGraduation: audit?.profile?.graduationYear,
       language: prefs.languagePrefix ? LANGUAGE_SUBJECTS[prefs.languagePrefix] : undefined,
       major: prefs.majorPrefix ? (MAJOR_OPTIONS[prefs.majorPrefix] ?? subjects[prefs.majorPrefix] ?? prefs.majorPrefix) : undefined,
+      // From Degree Works. Course codes only: no grades, terms or titles.
+      declaredMajor: audit?.profile?.major,
+      languagePlacement: audit?.profile?.languagePlacement,
+      mathPlacement: audit?.profile?.mathPlacement,
+      takenCodes: (audit?.courses ?? []).filter((course) => course.status === "completed" || course.status === "in-progress").map((course) => course.code),
       audit: summary ? {
         open: summary.open.map((need) => need.label),
         inProgress: summary.inProgress.map((need) => need.label),
@@ -402,7 +410,7 @@ export default function ChatWidget() {
             <div className="chat-avatar" aria-hidden="true">✦</div>
             <div>
               <strong>Planning Assistant</strong>
-              <span>{audit ? `Degree Works audit loaded · ${audit.requirements.length} requirements` : "Spring 2027 course advisor"}</span>
+              <span>{audit ? "Degree Works linked · Saved academic history" : "Spring 2027 course advisor"}</span>
             </div>
             <button className="chat-close" aria-label="Close chat" onClick={() => setOpen(false)}>×</button>
           </header>

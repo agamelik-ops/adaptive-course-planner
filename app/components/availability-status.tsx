@@ -15,6 +15,7 @@ export default function AvailabilityStatus({ record, detailed = false }: { recor
     {record?.reserved && <span className="seat-warning">Open seats reserved for waitlisted students</span>}
     {record?.seats === 0 && <span className="seat-warning">Class full</span>}
     {record && <small>Last checked {new Date(record.checkedAt).toLocaleString()}</small>}
+    {record && <small>Last changed {record.changedAt ? new Date(record.changedAt).toLocaleString() : "No changes observed yet"}</small>}
     {detailed && record && <><span className="availability-raw">{record.status}</span><small>Availability can change before registration.</small></>}
   </span>;
 }

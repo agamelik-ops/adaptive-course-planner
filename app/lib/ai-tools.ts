@@ -14,6 +14,10 @@ export type StudentContext = {
   plan: Course[];
   classYear?: ClassYear;
   expectedGraduation?: string;
+  declaredMajor?: string;
+  languagePlacement?: string;
+  mathPlacement?: string;
+  takenCodes?: string[]; // completed or in-progress course codes, e.g. "SPA 101"
   language?: string;
   major?: string;
   audit?: { open: string[]; inProgress: string[]; complete: string[] };
@@ -125,7 +129,8 @@ function searchTool(args: Record<string, unknown>, ctx: StudentContext) {
   const latest = toMinutes(args.latest_end);
   const fitsPlan = args.fits_plan !== false;
   const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 10);
-  const planCodes = new Set(ctx.plan.map((course) => course.code));
+  // Skip courses already in the plan or already taken (per Degree Works).
+  const planCodes = new Set([...ctx.plan.map((course) => course.code), ...(ctx.takenCodes ?? [])]);
 
   list = list.filter((course) =>
     course.meetings.length > 0 &&

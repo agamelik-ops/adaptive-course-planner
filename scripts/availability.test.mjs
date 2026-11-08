@@ -38,24 +38,24 @@ test('planner bridge writes snapshots and notifies the open planner',async()=>{
   const snapshot={version:1,term:'202620',records:[{crn:'20277',status:'1 of 25 seats remain.',checkedAt}]};
   vm.runInNewContext(fs.readFileSync(new URL('../extension/planner-bridge.js',import.meta.url),'utf8'),{
     chrome:{storage:{local:{get:async()=>({'fm-availability:spring-2027:v1':snapshot})},onChanged:{addListener:fn=>{listener=fn;}}}},
-    localStorage:{setItem:(key,value)=>{written[key]=value;}},window:{dispatchEvent:()=>{notified=true;}},Event,
+    localStorage:{getItem:()=>null,setItem:(key,value)=>{written[key]=value;}},window:{addEventListener(){},dispatchEvent:()=>{notified=true;}},Event,
   });
   await Promise.resolve();
   assert.equal(JSON.parse(written['fm-availability:spring-2027:v1']).records[0].crn,'20277');assert(notified);assert.equal(typeof listener,'function');
 });
 
 
-async function simulateFullSync({repeat=false,cancel=false}={}) {
+async function simulateFullSync({repeat=false,cancel=false, saved={}, number, expired=false, status="1 of 25 seats remain."}={}) {
   let stage='results', page=0, listener;
-  const saved={};
   const visible=(yes)=>({getClientRects:()=>yes?[{}]:[]});
   const crns=()=>page===0?['20277','20278']:(repeat?['20277']:['20288']);
-  const row=crn=>({querySelector:selector=>selector.includes('courseReferenceNumber')?{textContent:crn}:selector.includes('section-details-link')?{getAttribute:()=>`202620,${crn}`}:{getAttribute:()=> '1 of 25 seats remain.'}});
+  const row=crn=>({querySelector:selector=>selector.includes('courseReferenceNumber')?{textContent:crn}:selector.includes('courseNumber')?{textContent:number || "100"}:selector.includes('section-details-link')?{getAttribute:()=>`202620,${crn}`}:{getAttribute:()=>status}});
   const document={
     querySelector(selector) {
       if(selector==='#search-again-button')return {...visible(stage==='results'),click(){stage='search';}};
       if(selector==='#search-clear')return {...visible(stage==='search'),click(){}};
       if(selector==='#search')return {textContent:'Term: Spring 2027'};
+      if(selector==='#txt_courseNumber')return {value:'',dispatchEvent(){}};
       if(selector==='#search-go')return {...visible(stage==='search'),click(){stage='results';page=0;}};
       if(selector==='#searchResultsTable')return visible(stage==='results');
       if(selector==='#searchTerms')return {textContent:'Term: Spring 2027'};
@@ -65,8 +65,8 @@ async function simulateFullSync({repeat=false,cancel=false}={}) {
     },
     querySelectorAll(selector) {return selector.includes('tbody tr')?crns().map(row):stage==='results'?crns().map(crn=>({textContent:crn})):[];}
   };
-  await vm.runInNewContext(`(${syncAllAvailability.toString()})()`,{
-    location:{origin:'https://prd-reg9.fandm.edu',pathname:'/StudentRegistrationSsb/ssb/classSearch/classSearch'},
+  await vm.runInNewContext(`(${syncAllAvailability.toString()})(${JSON.stringify(number ? {number} : {})})`,{
+    location:{origin:expired?'https://login.fandm.edu':'https://prd-reg9.fandm.edu',pathname:'/StudentRegistrationSsb/ssb/classSearch/classSearch'},
     document, setTimeout:fn=>{queueMicrotask(fn);}, Event,
     chrome:{storage:{local:{get:async key=>({[key]:saved[key]}),set:async values=>{
       Object.assign(saved,values);
@@ -90,7 +90,7 @@ test('full sync reports repeated pages and cancellation without claiming complet
   assert.match(repeated['fm-availability-sync'].message,/repeated/);
   const cancelled=await simulateFullSync({cancel:true});
   assert.equal(cancelled['fm-availability-sync'].state,'cancelled');
-  assert.equal(cancelled['fm-availability:spring-2027:v1'].records.length,2);
+  assert.equal(cancelled['fm-availability:spring-2027:v1'],undefined);
 });
 
 
@@ -98,7 +98,7 @@ test('update status never presents stopped or overdue refreshes as live',()=>{
   const {autoUpdateLabel}=moduleExports;
   const now=Date.now();
   assert.match(autoUpdateLabel(null,now),/paused/);
-  assert.match(autoUpdateLabel(JSON.stringify({enabled:true,state:'waiting',nextCheckAt:now+300000}),now),/Every 5 minutes/);
+  assert.match(autoUpdateLabel(JSON.stringify({enabled:true,state:'waiting',nextCheckAt:now+300000}),now),/Plan every 5 minutes/);
   assert.match(autoUpdateLabel(JSON.stringify({enabled:true,state:'waiting',nextCheckAt:now-120000}),now),/paused/);
   assert.match(autoUpdateLabel(JSON.stringify({enabled:true,state:'syncing',updatedAt:now-180000}),now),/paused/);
 });
@@ -106,12 +106,12 @@ test('update status never presents stopped or overdue refreshes as live',()=>{
 test('automatic scheduler refreshes immediately, schedules next pass, and pauses on tab close',async()=>{
   const values={}, handlers={};let scans=0,alarm=null;
   const chrome={
-    storage:{local:{get:async key=>({[key]:values[key]}),set:async data=>Object.assign(values,data)}},
+    storage:{onChanged:{addListener:fn=>handlers.changed=fn},local:{get:async key=>({[key]:values[key]}),set:async data=>Object.assign(values,data)}},
     alarms:{create:async(name,settings)=>{alarm={name,...settings};},clear:async()=>{alarm=null;},onAlarm:{addListener:fn=>handlers.alarm=fn}},
     permissions:{contains:async()=>true},
     tabs:{create:async()=>({id:1}),get:async id=>({id,url:'https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch'}),onRemoved:{addListener:fn=>handlers.removed=fn},onUpdated:{addListener:fn=>handlers.updated=fn}},
     scripting:{executeScript:async()=>{scans++;values['fm-availability-sync']={state:'complete'};}},
-    runtime:{id:'test',onMessage:{addListener:fn=>handlers.message=fn},onStartup:{addListener:fn=>handlers.startup=fn},onInstalled:{addListener:fn=>handlers.installed=fn}}
+    runtime:{id:'test',onMessage:{addListener:fn=>{const previous=handlers.message;handlers.message=(...args)=>{previous?.(...args);return fn(...args);};}},onStartup:{addListener:fn=>handlers.startup=fn},onInstalled:{addListener:fn=>handlers.installed=fn}}
   };
   vm.runInNewContext(fs.readFileSync(new URL('../extension/background.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),{chrome,syncAllAvailability,URL});
   const reply=await new Promise(resolve=>handlers.message({type:'connect-fm'},{id:'test'},resolve));
@@ -124,6 +124,7 @@ test('automatic scheduler refreshes immediately, schedules next pass, and pauses
   assert.equal(scans,1);assert.equal(values['fm-availability-auto'].state,'waiting');
   assert.equal(alarm.name,'fm-refresh-availability');
   assert(alarm.when>Date.now());
+  values['fm-availability-auto'].lastCatalogAt=Date.now()-31*60000;
   handlers.alarm({name:alarm.name});
   for(let i=0;i<30;i++)await Promise.resolve();
   assert.equal(scans,2);
@@ -166,15 +167,16 @@ test('merged extension preserves Degree Works import approval and availability p
   const html=fs.readFileSync(new URL('../extension/popup.html',import.meta.url),'utf8');
   assert(html.includes('id="sync"'));assert(html.includes('id="audit"'));
   const source=fs.readFileSync(new URL('../extension/degree-audit.mjs',import.meta.url),'utf8');
-  assert(source.includes('const approved = confirm('));assert(source.includes('if (!approved) return null;'));
-  let returnedAudit=null,writes=0,opened=0;
-  const chrome={scripting:{executeScript:async()=>[{result:returnedAudit}]},storage:{local:{set:async data=>{writes++;assert.equal(data.degreeAudit,returnedAudit);}}},tabs:{create:async()=>{opened++;}}};
-  const importer=vm.runInNewContext(source.replace('export async function','async function')+'\nimportDegreeAudit;', {chrome,URL});
+  assert(source.includes('if (!approved) return false;'));
+  let approved=false,writes=0,opened=0;
+  const returnedAudit={version:2,partial:true,requirements:[{name:'Example requirement',status:'incomplete'}],courses:[]};
+  const chrome={scripting:{executeScript:async options=>[{result:options.args?approved:returnedAudit}]},storage:{local:{set:async data=>{writes++;assert.equal(data.degreeAudit,returnedAudit);}}},tabs:{create:async()=>{opened++;}}};
+  const importer=vm.runInNewContext(source.replaceAll('export async function','async function')+'\nimportDegreeAudit;', {chrome,URL});
   const tab={id:1,url:'https://degreeworks.fandm.edu/'};
   assert.equal(await importer(tab),false);assert.equal(writes,0);
-  returnedAudit={version:1,partial:true,requirements:[{name:'Example requirement',status:'incomplete'}]};
-  assert.equal(await importer(tab),true);assert.equal(writes,1);assert.equal(opened,1);
-  await assert.rejects(()=>importer({id:1,url:'https://example.com/'}),/Degree Works audit/);
+  approved=true;
+  assert.equal((await importer(tab)).requirements,1);assert.equal(writes,1);assert.equal(opened,1);
+  await assert.rejects(()=>importer({id:1,url:'https://example.com/'}),/Academic worksheet/);
 });
 
 
@@ -188,4 +190,108 @@ test('popup distinguishes connecting, successful connection, refreshing, and ove
   assert.equal(connectionView({...waiting,state:'syncing',updatedAt:now},{state:'running',updatedAt:now},now).connected,true);
   assert.equal(connectionView({...waiting,nextCheckAt:now-120000},null,now).active,false);
   assert.equal(connectionView({...waiting,enabled:false},null,now).state,'disconnected');
+});
+
+test('unchanged scans update checks only; changed seats update the record and change time', async () => {
+  const key='fm-availability:spring-2027:v1', checks='fm-availability-checks:202620';
+  const first=await simulateFullSync();
+  const snapshot=first[key];
+  snapshot.records.forEach(row=>row.checkedAt='2020-01-01T00:00:00.000Z');
+  assert.equal(snapshot.records[0].changedAt,null);
+  await simulateFullSync({saved:first});
+  assert.equal(first[key],snapshot,'unchanged records are not rewritten');
+  assert.notEqual(first[checks]['20277'],snapshot.records[0].checkedAt);
+  await simulateFullSync({saved:first,status:'0 of 25 seats remain.'});
+  assert.notEqual(first[key],snapshot);
+  assert.equal(first[key].records[0].changedAt,first[checks]['20277']);
+  const changed=first[key];
+  await simulateFullSync({saved:first,status:'0 of 25 seats remain.'});
+  assert.equal(first[key],changed,'last changed remains stable after another identical scan');
+});
+
+test('targeted checks keep unrelated saved sections; cancellations and expired sessions keep the snapshot',async()=>{
+  const key='fm-availability:spring-2027:v1';
+  const saved=await simulateFullSync();
+  saved[key].records.push({crn:'29999',status:'2 of 10 seats remain.',checkedAt});
+  await simulateFullSync({saved,number:'100'});
+  assert(saved[key].records.some(row=>row.crn==='29999'));
+  const snapshot=saved[key];
+  await simulateFullSync({saved,cancel:true,status:'0 of 25 seats remain.'});
+  assert.equal(saved[key],snapshot);
+  await simulateFullSync({saved,expired:true});
+  assert.equal(saved[key],snapshot);
+});
+
+async function schedulerFixture() {
+  const values={},handlers={},queries=[];
+  let block,fail=false,active=0,maxActive=0;
+  const chrome={
+    storage:{onChanged:{addListener:fn=>handlers.changed=fn},local:{get:async key=>({[key]:values[key]}),set:async data=>Object.assign(values,data)}},
+    alarms:{create:async(name,settings)=>{handlers.next={name,...settings};},clear:async()=>{handlers.next=null;},onAlarm:{addListener:fn=>handlers.alarm=fn}},
+    permissions:{contains:async()=>true},
+    tabs:{create:async()=>({id:1}),get:async id=>({id,url:'https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch'}),onRemoved:{addListener:fn=>handlers.removed=fn},onUpdated:{addListener:fn=>handlers.updated=fn}},
+    scripting:{executeScript:async options=>{
+      if(!options.func)return;
+      queries.push(options.args[0]);active++;maxActive=Math.max(maxActive,active);
+      if(block){const gate=block;block=null;await gate;}
+      values['fm-availability-sync']={state:fail?'error':'complete',message:fail?'Session expired. Reconnect.':'Done'};
+      active--;
+    }},
+    runtime:{id:'test',onMessage:{addListener:fn=>{const old=handlers.message;handlers.message=(...args)=>{old?.(...args);return fn(...args);};}},onStartup:{addListener:fn=>handlers.startup=fn},onInstalled:{addListener:fn=>handlers.installed=fn}},
+  };
+  vm.runInNewContext(fs.readFileSync(new URL('../extension/background.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),{chrome,syncAllAvailability,URL});
+  const message=type=>new Promise(resolve=>handlers.message({type},{id:'test',tab:{id:1}},resolve));
+  const flush=async()=>{for(let i=0;i<150;i++)await Promise.resolve();};
+  return {values,handlers,queries,message,flush,block:()=>{let release;block=new Promise(resolve=>{release=resolve;});return release;},fail:()=>{fail=true;},maxActive:()=>maxActive};
+}
+
+test('prioritizes unique planned course numbers and saves the full scan for its later interval',async()=>{
+  const f=await schedulerFixture();
+  f.values['fm-availability-plan:202620']=[{crn:'20277',number:'100'},{crn:'20278',number:'100'}];
+  await f.message('connect-fm');await f.message('connection-ready');await f.flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.queries)),[{number:'100'},{}]);
+  f.handlers.alarm({name:'fm-refresh-availability'});await f.flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.queries)),[{number:'100'},{},{number:'100'}]);
+  f.values['fm-availability-auto'].lastCatalogAt=Date.now()-31*60000;
+  f.handlers.alarm({name:'fm-refresh-availability'});await f.flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.queries.slice(-2))),[{number:'100'},{}]);
+});
+
+test('plan changes during a scan queue one pass and removed courses are no longer checked',async()=>{
+  const f=await schedulerFixture();
+  const key='fm-availability-plan:202620';
+  f.values[key]=[{crn:'20277',number:'100'}];
+  await f.message('connect-fm');
+  const release=f.block();
+  await f.message('connection-ready');await f.flush();
+  f.values[key]=[{crn:'20288',number:'200'}];
+  f.handlers.changed({[key]:{newValue:f.values[key]}},'local');
+  f.handlers.changed({[key]:{newValue:f.values[key]}},'local');
+  f.handlers.alarm({name:'fm-refresh-availability'});await f.flush();
+  assert.equal(f.queries.length,1);
+  release();await f.flush();
+  assert.equal(f.maxActive(),1);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.queries)),[{number:'100'},{},{number:'200'}]);
+  f.values[key]=[];f.handlers.changed({[key]:{newValue:[]}},'local');
+  f.handlers.alarm({name:'fm-refresh-availability'});await f.flush();
+  assert.equal(f.queries.length,3,'empty plans wait for the full catalog interval');
+});
+
+test('closing/reconnecting, session errors, and browser restarts pause safely without erasing saved results',async()=>{
+  const f=await schedulerFixture();
+  const snapshot={records:[{crn:'20277'}]};
+  f.values['fm-availability:spring-2027:v1']=snapshot;
+  await f.message('connect-fm');await f.message('connection-ready');await f.flush();
+  await f.handlers.removed(1);
+  assert.equal(f.values['fm-availability-auto'].enabled,false);
+  await f.message('connect-fm');await f.message('connection-ready');await f.flush();
+  assert.equal(f.values['fm-availability-auto'].state,'waiting');
+  f.fail();f.values['fm-availability-auto'].lastCatalogAt=0;
+  f.handlers.alarm({name:'fm-refresh-availability'});await f.flush();
+  assert.equal(f.values['fm-availability-auto'].enabled,false);
+  assert.match(f.values['fm-availability-auto'].message,/Session expired/);
+  assert.equal(f.values['fm-availability:spring-2027:v1'],snapshot);
+  f.handlers.startup();await f.flush();
+  assert.equal(f.values['fm-availability-auto'].enabled,false);
+  assert.equal(f.values['fm-availability:spring-2027:v1'],snapshot);
 });

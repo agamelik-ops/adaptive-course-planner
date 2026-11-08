@@ -1,4 +1,4 @@
-import { connectionView } from "./connection-status.mjs";
+import { connectionView, degreeWorksView } from "./connection-status.mjs";
 
 const status = document.getElementById("status");
 const start = document.getElementById("sync");
@@ -6,7 +6,17 @@ const stop = document.getElementById("cancel");
 const autoKey = "fm-availability-auto";
 const jobKey = "fm-availability-sync";
 async function render() {
-  const saved = await chrome.storage.local.get([autoKey, jobKey]);
+  const saved = await chrome.storage.local.get([autoKey, jobKey, "degreeAudit", "degreeAuditImport", "fm-availability:spring-2027:v1"]);
+  const audit = saved.degreeAudit;
+  const auditView = degreeWorksView(audit, saved.degreeAuditImport);
+  const auditPill = document.getElementById("audit-connection");
+  auditPill.textContent = auditView.label;
+  auditPill.className = `connection-pill ${auditView.state}`;
+  document.getElementById("audit-summary").textContent = auditView.detail;
+  document.getElementById("audit-note").textContent = auditView.note;
+  document.getElementById("audit").textContent = auditView.button;
+  document.getElementById("audit").disabled = auditView.importing;
+  document.getElementById("audit-status").textContent = saved.degreeAuditImport?.message || "";
   const auto = saved[autoKey];
   const job = saved[jobKey];
   const view = connectionView(auto, job);
@@ -14,8 +24,10 @@ async function render() {
   pill.textContent = view.label;
   pill.className = `connection-pill ${view.state}`;
   document.getElementById("last-sync").textContent = view.lastSync
-    ? `Last synced ${new Date(view.lastSync).toLocaleString()}${view.total ? ` · ${view.total} sections` : ""}`
+    ? `Last checked ${new Date(view.lastSync).toLocaleString()}`
     : "No successful sync yet";
+  const changedAt = saved["fm-availability:spring-2027:v1"]?.changedAt;
+  document.getElementById("last-changed").textContent = `Last changed: ${changedAt ? new Date(changedAt).toLocaleString() : "No changes observed yet"}`;
   start.hidden = view.connected;
   start.disabled = view.active;
   start.textContent = view.active ? "Connecting…" : auto ? "Reconnect to F&M" : "Connect to F&M";
@@ -46,14 +58,13 @@ document.getElementById("open").addEventListener("click", () => chrome.tabs.crea
 const auditButton = document.getElementById("audit");
 auditButton.addEventListener("click", async () => {
   auditButton.disabled = true;
+  auditButton.textContent = "Importing…";
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) throw new Error("Open your Degree Works audit first.");
-    // The background worker does the import so it survives this popup closing.
-    const response = await chrome.runtime.sendMessage({ type: "import-audit", tabId: tab.id });
+    const response = await chrome.runtime.sendMessage({ type: "import-degree-works", tabId: tab?.id });
     if (response?.error) throw new Error(response.error);
-    status.textContent = response?.imported ? "Degree Works requirements imported locally." : "No requirements imported. You can try again from your expanded Degree Works audit.";
+    document.getElementById("audit-status").textContent = response.result ? "Degree Works imported. Your academic history and degree progress are saved." : "Import cancelled. Your saved audit was not changed.";
   } catch (error) {
-    status.textContent = error instanceof Error ? error.message : "Could not import requirements.";
-  } finally { auditButton.disabled = false; }
+    document.getElementById("audit-status").textContent = error instanceof Error ? error.message : "Could not import Degree Works.";
+  } finally { await render(); }
 });

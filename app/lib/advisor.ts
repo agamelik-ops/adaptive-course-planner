@@ -108,6 +108,7 @@ export type AdvisorContext = {
   classYear?: ClassYear;
   languagePrefix?: string;
   majorPrefix?: string;
+  academicCourses?: { code: string; status: string }[];
 };
 
 function candidatesFor(need: Need, ctx: AdvisorContext): Course[] {
@@ -130,7 +131,7 @@ function candidatesFor(need: Need, ctx: AdvisorContext): Course[] {
 /** Ranked sections for a need, skipping anything that conflicts or can't be taken. */
 export function recommend(need: Need, ctx: AdvisorContext, limit = 3): Course[] {
   const busy = [...ctx.plan, ...ctx.pending];
-  const takenCodes = new Set(busy.map((course) => course.code));
+  const takenCodes = new Set([...busy.map((course) => course.code), ...(ctx.academicCourses ?? []).filter((course) => course.status === "completed" || course.status === "in-progress").map((course) => course.code)]);
   return candidatesFor(need, ctx)
     .filter((course) =>
       course.meetings.length > 0 &&
