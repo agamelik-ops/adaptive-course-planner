@@ -41,6 +41,14 @@ const RULES: Rule[] = [
   { test: /social science/i, need: { id: "socs", label: "Social Sciences", kind: "dist", dist: ["SOCS"] } },
 ];
 
+/** Rebuild a need from its id (the server receives ids, not full objects). */
+export function needFromId(id: string): Need | undefined {
+  for (const rule of RULES) {
+    if (!("skip" in rule) && rule.need.id === id) return { ...rule.need, status: "incomplete", sources: [] };
+  }
+  return undefined;
+}
+
 const STATUS_RANK: Record<RequirementStatus, number> = { incomplete: 3, unknown: 2, "in-progress": 1, complete: 0 };
 
 export function summarizeAudit(audit: DegreeAudit): AuditSummary {

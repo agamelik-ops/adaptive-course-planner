@@ -41,6 +41,7 @@ function readContext(raw: Record<string, unknown> | undefined): StudentContext {
   const plan = textList(raw?.planCrns).map((crn) => courseByCrn(crn)).filter((course): course is Course => !!course);
   const audit = raw?.audit as Record<string, unknown> | undefined;
   const year = text(raw?.classYear);
+  const needs = raw?.needIds as Record<string, unknown> | undefined;
   return {
     plan,
     classYear: year && YEARS.has(year) ? (year as ClassYear) : undefined,
@@ -53,7 +54,10 @@ function readContext(raw: Record<string, unknown> | undefined): StudentContext {
       .map((code) => code.toUpperCase().trim()).filter((code) => /^[A-Z]{2,5} \d{2,4}[A-Z]?$/.test(code)),
     language: text(raw?.language, 40),
     major: text(raw?.major, 60),
+    majorSubject: text(raw?.majorSubject, 4)?.toUpperCase(),
+    languageSubject: text(raw?.languageSubject, 4)?.toUpperCase(),
     audit: audit ? { open: textList(audit.open), inProgress: textList(audit.inProgress), complete: textList(audit.complete) } : undefined,
+    needIds: needs ? { open: textList(needs.open), satisfied: textList(needs.satisfied) } : undefined,
   };
 }
 
@@ -64,8 +68,16 @@ function systemPrompt(ctx: StudentContext) {
     "When you show suggestion cards, the cards already list times, CRNs and instructors, so keep your text to 1-3 short sentences about why these fit.",
     "",
     "Rules:",
-    "- Only talk about courses you found with the tools. Never invent courses, CRNs, times, instructors or requirements.",
+    "- Only talk about courses you found with the tools. Never invent courses, CRNs, times, instructors or requirements. Never guess a course's title: use the title a tool returned, or just the course code.",
     "- When you recommend specific sections, call suggest_courses so the student gets Accept/Reject cards. Then briefly explain your picks in text.",
+    "",
+    "Planning a semester:",
+    "- When the student asks for a schedule, a plan, recommendations for next semester, or 'what should I take', call build_schedule. Don't assemble a schedule by hand, and don't also call suggest_courses for the same courses (build_schedule already shows them as cards).",
+    "- Majors: F&M students declare a major in the spring of sophomore year, so first-years and fall sophomores usually show 'Undeclared' in Degree Works. If the student context has no declared major and no 'Interested in majoring in', and the student hasn't named a major in this conversation, do NOT build yet: first ask one short question, e.g. 'What are you thinking of majoring in? If you're not sure yet, I'll build a plan to explore a few options.' Build only after they answer (if they say they're not sure, build without major_subject). A junior or senior with no declared major: ask what their major is.",
+    "- When the student names a major or interest in chat, pass it as major_subject.",
+    "- After build_schedule, the cards already show times, CRNs and instructors, so don't repeat them. Write one short line per course saying its role, using only the 'why' from the tool (don't add claims of your own). Then mention up to 2 major courses they can't take yet and what they need first (from not_yet_eligible_in_major), plus any notes. Keep the whole reply under about 120 words.",
+    "- If they reject a course or want changes (no Fridays, later start, different subject), call build_schedule again with those constraints.",
+    "- Use check_prerequisites when asked whether they can take a course. search_courses already hides courses they aren't eligible for.",
     "- Respect the student's constraints (days, times, workload, interests). Ask a short clarifying question if a request is ambiguous.",
     "- Mention prerequisites and permission requirements when relevant.",
     "- You are not an official adviser and cannot register students. For anything official (placement, petitions, declaring a major), point them to their adviser or the Registrar.",
@@ -87,7 +99,7 @@ function systemPrompt(ctx: StudentContext) {
   if (ctx.mathPlacement) lines.push(`- Math placement: ${ctx.mathPlacement}`);
   if (ctx.takenCodes?.length) lines.push(`- Already taken or in progress (don't recommend these): ${ctx.takenCodes.join(", ")}`);
   if (ctx.language) lines.push(`- Studying language: ${ctx.language}`);
-  if (ctx.major) lines.push(`- Interested in majoring in: ${ctx.major}`);
+  if (ctx.major) lines.push(`- Interested in majoring in: ${ctx.major}${ctx.majorSubject ? ` (${ctx.majorSubject})` : ""}`);
   lines.push(ctx.plan.length
     ? `- Current plan: ${ctx.plan.map((course) => `${course.code} ${course.title} (CRN ${course.crn}, ${meeting(course)})`).join("; ")}`
     : "- Current plan: empty");
