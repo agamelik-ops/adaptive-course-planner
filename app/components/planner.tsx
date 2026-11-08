@@ -330,6 +330,11 @@ export default function Planner() {
                         </span>
                         <span className="result-title">{course.title}</span>
                         <span className="result-meta">{meeting(course)}</span>
+                        {course.instructors.length > 0 && (
+                          <span className="result-meta">
+                            {course.instructors.map((name) => name.replace(/,\s*\.?\s*$/, "")).join("; ")}
+                          </span>
+                        )}
                         <span className="result-meta">
                           CRN {course.crn}
                           {course.section

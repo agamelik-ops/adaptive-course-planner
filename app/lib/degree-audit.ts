@@ -22,6 +22,18 @@ export type DegreeAudit = {
   warnings?: string[];
 };
 
+export type StudentLevel = "FR" | "SO" | "JR" | "SR";
+// Planning term is Spring 2027, so graduating in 2027 means senior, 2030 means first-year.
+const SPRING_TERM_YEAR = 2027;
+
+/** Class year for the Spring 2027 term, from Degree Works' "Anticipated Grad Year". */
+export function classYearFromAudit(audit: DegreeAudit | null): StudentLevel | undefined {
+  const year = Number(audit?.profile?.graduationYear?.match(/\d{4}/)?.[0]);
+  if (!year) return undefined;
+  const yearsLeft = year - SPRING_TERM_YEAR;
+  return yearsLeft <= 0 ? "SR" : yearsLeft === 1 ? "JR" : yearsLeft === 2 ? "SO" : "FR";
+}
+
 const AUDIT_KEY = "fm-course-planner:degree-audit:v1";
 const CHANGE_EVENT = "fm-audit-change";
 const BRIDGE_SOURCE = "fm-planner-extension";
@@ -105,7 +117,12 @@ export function subscribeAudit(onChange: (audit: DegreeAudit | null) => void) {
     const data = event.data as { source?: string; type?: string; audit?: unknown } | null;
     if (data?.source !== BRIDGE_SOURCE || data.type !== "degree-audit") return;
     const audit = parseAudit(data.audit);
-    if (audit) saveAudit(audit);
+    if (!audit) return;
+    // Keep the newest import. An older copy of the extension (or a stale bridge)
+    // can send an outdated audit after a fresh one; ignore it.
+    const current = readAudit();
+    if (current && Date.parse(current.checkedAt) > Date.parse(audit.checkedAt)) return;
+    saveAudit(audit);
   };
   const onLocal = (event: Event) => onChange((event as CustomEvent<DegreeAudit | null>).detail);
   window.addEventListener("message", onMessage);

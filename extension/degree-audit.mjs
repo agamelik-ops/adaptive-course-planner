@@ -88,7 +88,7 @@ export async function importDegreeAudit(tab) {
   if (!audit?.requirements?.length) throw new Error("Could not read the audit. Reload Degree Works and try again.");
   // Confirm in the source tab. A service-worker caller survives the popup closing.
   const [{ result: approved }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: (summary) => confirm(summary), args: [
-    `Import Degree Works?\n\n${audit.requirements.length} requirements, ${audit.courses?.length || 0} course records, ${audit.blocks?.length || 0} academic blocks.\n\nIncludes program, placement results, course titles, terms, grades and credits where available.\n\nSaved locally for the planner and its recommendations. Nothing is sent to an AI service. This is a worksheet snapshot and may be incomplete.`,
+    `Import Degree Works?\n\n${audit.requirements.length} requirements, ${audit.courses?.length || 0} course records, ${audit.blocks?.length || 0} academic blocks.\n\nIncludes program, placement results, course titles, terms, grades and credits where available.\n\nSaved locally in your browser for the planner and its recommendations. If you ask the planner's AI assistant a question, it shares only a summary with the AI service: requirement names and statuses, class year, graduation year, major, placement results and the course codes you've taken. Never grades, your name or student ID. This is a worksheet snapshot and may be incomplete.`,
   ] });
   if (!approved) return false;
   await chrome.storage.local.set({ degreeAudit: audit });

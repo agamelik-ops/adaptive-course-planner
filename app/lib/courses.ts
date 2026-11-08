@@ -78,25 +78,45 @@ export function findCourse(crn: string): Course | undefined {
   return BY_CRN.get(crn.trim());
 }
 
+// Full subject names so searches like "Spanish" or "computer science" work,
+// and so the assistant can recognize a major the student types.
+const SUBJECT_NAMES: Record<string, string> = {
+  AFS: "Africana Studies", AMS: "American Studies", ANT: "Anthropology",
+  ART: "Art", AST: "Astronomy", BIO: "Biology", BOS: "Business Organizations and Society",
+  CHM: "Chemistry", CHN: "Chinese", CLS: "Classics", CPS: "Computer Science",
+  DSC: "Data Science", ECO: "Economics", ENE: "Earth and Environment", ENG: "English",
+  FLM: "Film", FRN: "French", GER: "German", GOV: "Government", GRK: "Greek",
+  GST: "Global Studies", HAA: "History of Art and Architecture", HIS: "History",
+  INT: "Interdepartmental", IST: "International Studies", ITA: "Italian", JPN: "Japanese",
+  JST: "Judaic Studies", LAT: "Latin", LIN: "Linguistics", LIT: "Comparative Literary Studies",
+  MAT: "Mathematics", MUS: "Music", NSP: "Natural Science in Perspective", PBH: "Public Health",
+  PHI: "Philosophy", PHY: "Physics", PSY: "Psychology", RST: "Religious Studies",
+  RUS: "Russian", SOC: "Sociology", SPA: "Spanish", SPM: "Cognitive Science and Moral Psychology",
+  STS: "Science Technology and Society", TND: "Theatre and Dance", WGS: "Women's Gender and Sexuality Studies",
+};
+const LANGUAGE_PREFIXES = new Set(["CHN", "FRN", "GER", "GRK", "ITA", "JPN", "LAT", "RUS", "SPA"]);
+
+// Lowercase, strip accents and punctuation so "Caamaño", "caamano" and "Shelton, Laura" all match.
+function normalize(text: string) {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9&\s]/g, " ");
+}
+
 export function searchCourses(query: string): Course[] {
-  const terms = query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
 
   if (!terms.length) return COURSES;
 
   return COURSES.filter((course) => {
-    const searchable = [
-      course.code,
-      course.title,
+    const searchable = normalize([
       course.crn,
+      course.code,
+      course.code.replace(/\s/g, ""),
+      SUBJECT_NAMES[course.subject] ?? "",
+      course.title,
       ...course.instructors,
-      ...course.dist
-    ]
-      .join(" ")
-      .toLowerCase();
+      ...course.dist,
+      LANGUAGE_PREFIXES.has(course.subject) ? "language languages" : "",
+    ].join(" "));
 
     return terms.every((term) => searchable.includes(term));
   });
@@ -137,5 +157,5 @@ export function overlaps(first: Course, second: Course): boolean {
 export const subjects: Record<string, string> = Object.fromEntries(
   [...new Set(COURSES.map((course) => course.subject))]
     .sort()
-    .map((subject) => [subject, subject])
+    .map((subject) => [subject, SUBJECT_NAMES[subject] ?? subject])
 );
