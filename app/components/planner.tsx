@@ -21,6 +21,12 @@ export default function Planner() {
   const savedPlan = useSyncExternalStore<string | null | undefined>(subscribePlan, readPlan, serverPlan);
   const selected = useMemo(() => restoreCourses(savedPlan ?? null), [savedPlan]);
   const loading = savedPlan === undefined;
+  useEffect(() => {
+    if (savedPlan === undefined) return;
+    // Only course identifiers leave the planner, never the Degree Works audit.
+    try { localStorage.setItem("fm-availability-plan:202620", JSON.stringify(selected.map(course => ({ crn: course.crn, number: course.code.split(/\s+/)[1] })))); } catch { return; }
+    window.dispatchEvent(new Event("fm-availability-plan-change"));
+  }, [selected, savedPlan]);
   const [saveError, setSaveError] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
@@ -64,7 +70,7 @@ export default function Planner() {
       <main className="planner-shell">
         <div className="page-heading"><div><h1>Make room for what’s next.</h1><p>Find your classes. Build your week. See the possibilities.</p></div><span className="demo-badge">Spring 2027</span></div>
         <p className="demo-note">Courses from the imported Spring 2027 master schedule. Planning does not register you or confirm seat availability. Your plan saves automatically in this browser for Spring 2027.</p>
-        <div className="availability-guide"><strong>Seat availability</strong><AutoUpdateStatus /><p>Click “Connect to F&M” in the extension. It opens the registration page and imports all Spring 2027 availability for you. Sign in and select Spring 2027 if prompted—no scrolling or paging needed. Keep the F&M tab open for automatic updates every 5 minutes.</p><a href="https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch" target="_blank" rel="noreferrer">Open Browse Classes ↗</a></div>
+        <div className="availability-guide"><strong>Seat availability</strong><AutoUpdateStatus /><p>Click “Connect to F&M” in the extension. It opens the registration page and imports all Spring 2027 availability for you. Sign in and select Spring 2027 if prompted—no scrolling or paging needed. Keep the F&M tab open for automatic updates (planned courses every 5 minutes; full catalog every 30 minutes).</p><a href="https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch" target="_blank" rel="noreferrer">Open Browse Classes ↗</a></div>
         <div className="planner-layout">
           <aside className="sidebar">
             <section className="panel search-panel" aria-labelledby="find-heading">

@@ -5,6 +5,9 @@ const autoKey = "fm-availability-auto";
 const jobKey = "fm-availability-sync";
 const alarmName = "fm-refresh-availability";
 const interval = 5 * 60 * 1000;
+const catalogInterval = 30 * 60 * 1000;
+const planKey = "fm-availability-plan:202620";
+let planPending = false;
 let busy = false;
 let generation = 0;
 
@@ -28,20 +31,34 @@ async function refresh() {
     const url = new URL(tab.url || "about:blank");
     if (url.origin !== "https://prd-reg9.fandm.edu" || url.pathname !== "/StudentRegistrationSsb/ssb/classSearch/classSearch") throw new Error("Updates paused. Open Browse Classes and start automatic updates again.");
     if (runGeneration !== generation) return;
-    await chrome.storage.local.set({ [autoKey]: { ...config, state: "syncing", message: "Refreshing all Spring 2027 sections…", updatedAt: Date.now(), nextCheckAt: null } });
+    await chrome.storage.local.set({ [autoKey]: { ...config, state: "syncing", message: "Refreshing Spring 2027 availability…", updatedAt: Date.now(), nextCheckAt: null } });
     if (runGeneration !== generation) return;
-    await chrome.scripting.executeScript({ target: { tabId: config.tabId }, func: syncAllAvailability });
+    const plan = (await chrome.storage.local.get(planKey))[planKey] || [];
+    const numbers = [...new Set(plan.map(row => row.number).filter(value => /^\d{3}[A-Z]?$/i.test(value)))];
+    const fullDue = !config.lastCatalogAt || Date.now() - config.lastCatalogAt >= catalogInterval;
+    // Prioritize the plan on the first connection too. A full scan is much less frequent.
+    const queries = [...numbers.map(number => ({ number })), ...(fullDue ? [{}] : [])];
+    for (const query of queries) {
+      if (runGeneration !== generation) return;
+      await chrome.scripting.executeScript({ target: { tabId: config.tabId }, func: syncAllAvailability, args: [query] });
+      const job = (await chrome.storage.local.get(jobKey))[jobKey];
+      if (job?.state !== "complete") throw new Error(job?.message || "Updates paused. The registration session may have expired.");
+    }
     const current = (await chrome.storage.local.get(autoKey))[autoKey];
     if (!current?.enabled || runGeneration !== generation) return;
     const job = (await chrome.storage.local.get(jobKey))[jobKey];
     if (job?.state !== "complete") throw new Error(job?.message || "Updates paused. The registration session may have expired.");
-    const nextCheckAt = Date.now() + interval;
-    await chrome.storage.local.set({ [autoKey]: { ...current, state: "waiting", lastSuccessfulAt: Date.now(), message: "Automatic updates on · Every 5 minutes", updatedAt: Date.now(), nextCheckAt } });
+    const lastCatalogAt = fullDue ? Date.now() : config.lastCatalogAt;
+    const nextCheckAt = Math.min(Date.now() + (numbers.length ? interval : catalogInterval), lastCatalogAt + catalogInterval);
+    await chrome.storage.local.set({ [autoKey]: { ...current, state: "waiting", lastSuccessfulAt: queries.length ? Date.now() : current.lastSuccessfulAt, lastCatalogAt, message: "Automatic updates on · Plan every 5 minutes · Catalog every 30 minutes", updatedAt: Date.now(), nextCheckAt } });
     await chrome.alarms.create(alarmName, { when: nextCheckAt });
   } catch (error) {
     if (runGeneration !== generation) return;
     await pause(error instanceof Error ? error.message : "Updates paused. Reconnect Browse Classes.");
-  } finally { busy = false; }
+  } finally {
+    busy = false;
+    if (planPending) { planPending = false; void refresh(); }
+  }
 }
 
 async function watchConnection(tabId) {
@@ -73,6 +90,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({ ok: true });
   })().catch((error) => respond({ error: error.message }));
   return true;
+});
+// The plan persists across popup/tab closure. Changes queue one follow-up pass,
+// never another concurrent scan, and removals stop future targeted searches.
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== "local" || !changes[planKey]) return;
+  if (busy) planPending = true;
+  else {
+    const config = (await chrome.storage.local.get(autoKey))[autoKey];
+    if (config?.enabled && config.state !== "connecting") await chrome.alarms.create(alarmName, { when: Date.now() + 1000 });
+  }
 });
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === alarmName) void refresh(); });
 chrome.tabs.onRemoved.addListener(async (tabId) => {

@@ -6,7 +6,7 @@ const stop = document.getElementById("cancel");
 const autoKey = "fm-availability-auto";
 const jobKey = "fm-availability-sync";
 async function render() {
-  const saved = await chrome.storage.local.get([autoKey, jobKey, "degreeAudit", "degreeAuditImport"]);
+  const saved = await chrome.storage.local.get([autoKey, jobKey, "degreeAudit", "degreeAuditImport", "fm-availability:spring-2027:v1"]);
   const audit = saved.degreeAudit;
   const auditView = degreeWorksView(audit, saved.degreeAuditImport);
   const auditPill = document.getElementById("audit-connection");
@@ -24,8 +24,10 @@ async function render() {
   pill.textContent = view.label;
   pill.className = `connection-pill ${view.state}`;
   document.getElementById("last-sync").textContent = view.lastSync
-    ? `Last synced ${new Date(view.lastSync).toLocaleString()}${view.total ? ` · ${view.total} sections` : ""}`
+    ? `Last checked ${new Date(view.lastSync).toLocaleString()}`
     : "No successful sync yet";
+  const changedAt = saved["fm-availability:spring-2027:v1"]?.changedAt;
+  document.getElementById("last-changed").textContent = `Last changed: ${changedAt ? new Date(changedAt).toLocaleString() : "No changes observed yet"}`;
   start.hidden = view.connected;
   start.disabled = view.active;
   start.textContent = view.active ? "Connecting…" : auto ? "Reconnect to F&M" : "Connect to F&M";
