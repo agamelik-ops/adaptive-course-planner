@@ -5,8 +5,8 @@ import {
   LANGUAGE_SUBJECTS, MAJOR_OPTIONS, matchSubject, reasonFor, recommend, summarizeAudit,
   type AdvisorContext, type AuditSummary, type ClassYear, type Need,
 } from "../lib/advisor";
-import { meeting, overlaps, subjects, type Course } from "../lib/courses";
-import { parseAudit, readAudit, saveAudit, subscribeAudit, type DegreeAudit } from "../lib/degree-audit";
+import { courses as allCourses, meeting, overlaps, subjects, type Course } from "../lib/courses";
+import { classYearFromAudit, parseAudit, readAudit, saveAudit, subscribeAudit, type DegreeAudit } from "../lib/degree-audit";
 import { readPlan, restoreCourses, savePlan } from "../lib/saved-plan";
 
 type Action =
@@ -15,7 +15,8 @@ type Action =
   | { type: "major"; value: string | null }
   | { type: "plan" } | { type: "more" } | { type: "summary" } | { type: "accept-all" } | { type: "paste" };
 type Chip = { label: string; action: Action };
-type Suggestion = { id: number; need: Need; course: Course; reason: string; status: "pending" | "accepted" | "rejected" };
+// fromAi: picked by the AI for a need the rules engine doesn't know, so Reject can't auto-replace it.
+type Suggestion = { id: number; need: Need; course: Course; reason: string; status: "pending" | "accepted" | "rejected"; fromAi?: boolean };
 type Message = { id: number; role: "assistant" | "user"; text: string; chips?: Chip[]; suggestionIds?: number[] };
 type Prefs = { classYear?: ClassYear; languagePrefix?: string | null; majorPrefix?: string | null };
 
@@ -28,12 +29,30 @@ const MENU: Chip[] = [
   { label: "Build my plan", action: { type: "plan" } },
 ];
 
-// TODO(AI): free-form questions the rules engine doesn't understand end up here.
-// Swap this for a call to the AI backend, passing the conversation plus the
-// audit summary and the student's plan so answers stay grounded in real data.
-async function getReply(history: Message[]): Promise<string> {
-  void history;
-  return "I can’t answer open-ended questions yet — the AI part is coming soon. For now I can show what you still need for your degree and build a plan from it.";
+type AiSuggestionPayload = { crn: string; requirement: string; reason: string };
+type AiResult =
+  | { kind: "ok"; reply: string; suggestions: AiSuggestionPayload[] }
+  | { kind: "not-configured" }
+  | { kind: "error"; message: string };
+
+// Free-form questions go to the server route (app/api/chat/route.ts), which calls
+// the AI with real-catalog tools. Only requirement names/statuses, plan CRNs and
+// preferences are sent, never names or student IDs.
+async function askAI(history: Message[], context: Record<string, unknown>): Promise<AiResult> {
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history.map(({ role, text }) => ({ role, text })), context }),
+    });
+    if (response.status === 503) return { kind: "not-configured" };
+    if (response.status === 429) return { kind: "error", message: "The assistant is busy right now. Give it a few seconds and try again." };
+    if (!response.ok) return { kind: "error", message: "The AI is unavailable right now. Here’s what I can do without it." };
+    const data = await response.json();
+    return { kind: "ok", reply: String(data.reply ?? ""), suggestions: Array.isArray(data.suggestions) ? data.suggestions : [] };
+  } catch {
+    return { kind: "error", message: "I couldn’t reach the AI. Check your connection and try again." };
+  }
 }
 
 function shortDate(iso: string) {
@@ -75,14 +94,10 @@ export default function ChatWidget() {
 
   const summary = audit ? summarizeAudit(audit) : null;
 
-  useEffect(() => subscribeAudit((incoming) => {
-    setAudit(incoming);
-    if (incoming && startedRef.current) {
-      const id = nextId.current++;
-      const text = `I just received your updated Degree Works audit.\n\n${summaryText(incoming, summarizeAudit(incoming))}`;
-      setMessages((current) => [...current, { id, role: "assistant", text, chips: MENU }]);
-    }
-  }), []);
+  // The subscription lives for the whole page, so it calls whatever the latest
+  // handler is (kept in a ref) to see current preferences and conversation state.
+  const onAuditRef = useRef<(incoming: DegreeAudit | null) => void>(() => {});
+  useEffect(() => subscribeAudit((incoming) => onAuditRef.current(incoming)), []);
 
   useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
   useEffect(() => {
@@ -126,13 +141,35 @@ export default function ChatWidget() {
     if (current) {
       setAudit(current);
       say(`Hi! I’m your planning assistant. ${summaryText(current, summarizeAudit(current))}`);
-      askNext({}, current);
+      askNext(applyAuditYear(prefs, current), current);
     } else {
       say(
         "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, expand the sections, and click the F&M Course Planner extension. It’ll bring the audit here automatically.\n\nNo extension? You can paste the audit data instead.",
         [{ label: "Paste audit data", action: { type: "paste" } }],
       );
     }
+  }
+
+  // Use the class level / expected graduation from Degree Works instead of asking.
+  function applyAuditYear(base: Prefs, current: DegreeAudit): Prefs {
+    const detected = classYearFromAudit(current);
+    if (!detected || base.classYear) return base;
+    const next = { ...base, classYear: detected };
+    setPrefs(next);
+    const label = YEARS.find((year) => year.value === detected)?.label.toLowerCase() ?? detected;
+    const grad = current.student?.expectedGraduation;
+    say(`From Degree Works, I see you’re a ${label}${grad ? ` (expected graduation ${grad})` : ""}. If that’s not right, just tell me your class year.`);
+    return next;
+  }
+
+  // A new audit arrived from the extension (possibly after the chat already started).
+  function handleIncomingAudit(incoming: DegreeAudit | null) {
+    setAudit(incoming);
+    if (!incoming || !startedRef.current) return;
+    say(`I just received your updated Degree Works audit.\n\n${summaryText(incoming, summarizeAudit(incoming))}`, MENU);
+    const waitingForYear = !prefs.classYear;
+    const next = applyAuditYear(prefs, incoming);
+    if (waitingForYear && next.classYear) askNext(next, incoming);
   }
 
   function askNext(nextPrefs: Prefs, currentAudit = audit) {
@@ -231,7 +268,9 @@ export default function ChatWidget() {
       say(`No problem. Here’s another option for ${item.need.label}:`, undefined, [next.id]);
     } else {
       setSuggestions(updated);
-      say(`That was the last option I found for ${item.need.label} that fits your schedule.`, MENU);
+      say(item.fromAi
+        ? `Okay, I’ve skipped ${item.course.code}. Tell me what you’d prefer instead (a different time, subject or professor) and I’ll look again.`
+        : `That was the last option I found for ${item.need.label} that fits your schedule.`, MENU);
     }
   }
 
@@ -267,7 +306,7 @@ export default function ChatWidget() {
         saveAudit(parsed);
         setAudit(parsed);
         say(`Got it! ${summaryText(parsed, summarizeAudit(parsed))}`);
-        askNext(prefs, parsed);
+        askNext(applyAuditYear(prefs, parsed), parsed);
       } else {
         say("That doesn’t look like a Degree Works audit. It should be JSON with a “requirements” list.");
       }
@@ -279,27 +318,79 @@ export default function ChatWidget() {
     const language = matchSubject(lower, LANGUAGE_SUBJECTS);
     const major = matchSubject(lower.replace(/i'?m |thinking|about|major(ing)? in|interested in|leaning toward/g, " "), { ...subjects, ...MAJOR_OPTIONS });
 
-    if (year && !prefs.classYear) return run({ type: "year", value: year });
-    if (language && prefs.classYear && prefs.languagePrefix === undefined && summary?.open.some((need) => need.kind === "language")) return run({ type: "language", value: language });
+    const notSure = /not sure|no idea|undecided|don'?t know/.test(lower);
+    const needsLanguage = !!summary?.open.some((need) => need.kind === "language");
+    const needsMajor = !!summary?.open.some((need) => need.kind === "major");
+
+    // Answers to the question the assistant just asked stay with the instant rules engine.
+    if (audit && !prefs.classYear && year) return run({ type: "year", value: year });
+    // Correcting a detected class year, e.g. "actually I'm a sophomore".
+    if (year && prefs.classYear && year !== prefs.classYear && /i'?m an?\b|i am an?\b|actually|class year/.test(lower)) {
+      setPrefs({ ...prefs, classYear: year });
+      return say(`Got it, I’ll plan for a ${YEARS.find((item) => item.value === year)?.label.toLowerCase()} from now on.`, MENU);
+    }
+    if (audit && prefs.classYear && needsLanguage && prefs.languagePrefix === undefined && (language || notSure)) return run({ type: "language", value: language });
+    if (audit && prefs.classYear && (!needsLanguage || prefs.languagePrefix !== undefined) && needsMajor && prefs.majorPrefix === undefined && (major || notSure)) return run({ type: "major", value: major });
+
+    // Everything else goes to the AI, which can search the real catalog.
+    setThinking(true);
+    const result = await askAI([...messages, { id: -1, role: "user", text: value }], aiContext());
+    setThinking(false);
+    if (result.kind === "ok") return showAiReply(result.reply, result.suggestions);
+    if (result.kind === "error") say(result.message);
+
+    // AI not set up or unavailable: fall back to the rules engine.
     if (major && /major|thinking|interested|leaning|study/.test(lower)) return run({ type: "major", value: major });
-    if (major && prefs.classYear && prefs.languagePrefix !== undefined && prefs.majorPrefix === undefined) return run({ type: "major", value: major });
     if (/still need|what.*need|left|missing|requirement|remaining|audit/.test(lower)) return run({ type: "summary" });
     if (/more|another|other option|else/.test(lower)) return run({ type: "more" });
     if (/plan|recommend|suggest|outline|schedule|what should i take/.test(lower)) return run({ type: "plan" });
-    if (/not sure|no idea|undecided|don'?t know/.test(lower)) {
-      if (prefs.classYear && prefs.languagePrefix === undefined && summary?.open.some((need) => need.kind === "language")) return run({ type: "language", value: null });
-      if (prefs.classYear && prefs.majorPrefix === undefined) return run({ type: "major", value: null });
-    }
-
-    setThinking(true);
-    try {
-      say(await getReply([...messages, { id: -1, role: "user", text: value }]), audit ? MENU : undefined);
-    } finally {
-      setThinking(false);
+    if (result.kind === "not-configured") {
+      say("I can’t answer open-ended questions until the AI is set up. For now I can show what you still need and build a plan from it.", audit ? MENU : undefined);
     }
   }
 
+  function aiContext(): Record<string, unknown> {
+    return {
+      planCrns: currentPlan().map((course) => course.crn),
+      classYear: prefs.classYear,
+      expectedGraduation: audit?.student?.expectedGraduation,
+      language: prefs.languagePrefix ? LANGUAGE_SUBJECTS[prefs.languagePrefix] : undefined,
+      major: prefs.majorPrefix ? (MAJOR_OPTIONS[prefs.majorPrefix] ?? subjects[prefs.majorPrefix] ?? prefs.majorPrefix) : undefined,
+      audit: summary ? {
+        open: summary.open.map((need) => need.label),
+        inProgress: summary.inProgress.map((need) => need.label),
+        complete: summary.complete.map((need) => need.label),
+      } : undefined,
+    };
+  }
+
+  function showAiReply(reply: string, picks: AiSuggestionPayload[]) {
+    const known = summary ? [...summary.open, ...summary.inProgress, ...summary.complete] : [];
+    const taken = new Set([...currentPlan(), ...suggestions.filter((item) => item.status !== "rejected").map((item) => item.course)].map((course) => course.crn));
+    const created: Suggestion[] = [];
+    for (const pick of picks) {
+      const course = allCourses.find((item) => item.crn === pick.crn);
+      if (!course || taken.has(course.crn)) continue;
+      taken.add(course.crn);
+      const label = pick.requirement.toLowerCase();
+      const need = known.find((item) => label.includes(item.label.toLowerCase()) || item.label.toLowerCase().includes(label));
+      created.push({
+        id: nextId.current++,
+        course,
+        reason: pick.reason || "Suggested by the assistant.",
+        status: "pending",
+        need: need ?? { id: `ai-${course.crn}`, label: pick.requirement || "Suggested", kind: "dist", dist: course.dist, status: "incomplete", sources: [] },
+        fromAi: !need,
+      });
+    }
+    if (created.length) setSuggestions((current) => [...current, ...created]);
+    say(reply, created.length ? [{ label: "Accept all", action: { type: "accept-all" } }, ...MENU] : (audit ? MENU : undefined), created.map((item) => item.id));
+  }
+
   // ---- rendering ---------------------------------------------------------
+
+  // Point the audit subscription at the latest handler (declared above).
+  useEffect(() => { onAuditRef.current = handleIncomingAudit; });
 
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant")?.id;
 

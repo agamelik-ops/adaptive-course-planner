@@ -1,4 +1,5 @@
 import { syncAllAvailability } from "./full-sync.mjs";
+import { importDegreeAudit } from "./degree-audit.mjs";
 
 const autoKey = "fm-availability-auto";
 const jobKey = "fm-availability-sync";
@@ -53,8 +54,15 @@ async function watchConnection(tabId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || !["connect-fm", "connection-ready", "stop-auto"].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id || !["connect-fm", "connection-ready", "stop-auto", "import-audit"].includes(message?.type)) return;
   (async () => {
+    if (message.type === "import-audit") {
+      // Runs here, not in the popup: the popup closes as soon as the student clicks
+      // OK on the confirmation dialog, which would cut the import off before saving.
+      const imported = await importDegreeAudit(await chrome.tabs.get(message.tabId));
+      respond({ ok: true, imported });
+      return;
+    }
     if (message.type === "stop-auto") {
       await pause("Disconnected. Saved availability remains visible.");
     } else if (message.type === "connection-ready") {

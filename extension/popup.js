@@ -1,5 +1,4 @@
 import { connectionView } from "./connection-status.mjs";
-import { importDegreeAudit } from "./degree-audit.mjs";
 
 const status = document.getElementById("status");
 const start = document.getElementById("sync");
@@ -49,8 +48,11 @@ auditButton.addEventListener("click", async () => {
   auditButton.disabled = true;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const imported = await importDegreeAudit(tab);
-    status.textContent = imported ? "Degree Works requirements imported locally." : "No requirements imported. You can try again from your expanded Degree Works audit.";
+    if (!tab?.id) throw new Error("Open your Degree Works audit first.");
+    // The background worker does the import so it survives this popup closing.
+    const response = await chrome.runtime.sendMessage({ type: "import-audit", tabId: tab.id });
+    if (response?.error) throw new Error(response.error);
+    status.textContent = response?.imported ? "Degree Works requirements imported locally." : "No requirements imported. You can try again from your expanded Degree Works audit.";
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : "Could not import requirements.";
   } finally { auditButton.disabled = false; }

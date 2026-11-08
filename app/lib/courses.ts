@@ -53,11 +53,16 @@ export const courses: Course[] = COURSES.map((course) => {
   };
 });
 
+// Lowercase, strip accents and punctuation so "Caamaño", "caamano" and "Shelton, Laura" all match.
+function normalize(text: string) {
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9&\s]/g, " ");
+}
+
 export function searchCourses(query: string) {
-  const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
   return courses.filter((course) => {
     const category = languages.has(course.code.split(" ")[0]) ? "language languages" : "";
-    const fields = `${course.crn} ${course.code} ${course.code.replace(/\s/g, "")} ${course.subject} ${course.title} ${category}`.toLowerCase();
+    const fields = normalize(`${course.crn} ${course.code} ${course.code.replace(/\s/g, "")} ${course.subject} ${course.title} ${course.instructors.join(" ")} ${category}`);
     return terms.every((term) => fields.includes(term));
   });
 }
