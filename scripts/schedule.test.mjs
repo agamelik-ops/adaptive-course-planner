@@ -26,7 +26,7 @@ function load(file) {
 }
 const lib = (name) => load(path.join(root, 'app/lib', name));
 const { courses, overlaps } = lib('courses');
-const { checkPrereq, makeRecord, parsePlacements } = lib('prereqs');
+const { checkPrereq, makeRecord, missingParts, parsePlacements } = lib('prereqs');
 const { buildSchedule, alternativeFor, majorPrefixFromProfile } = lib('schedule');
 const { summarizeAudit } = lib('advisor');
 
@@ -77,6 +77,18 @@ test('prerequisites: AND/OR groups, placements and compact codes like "CPS112"',
   assert.equal(status('20375', ['CPS 112'], { SPA: 101 }), 'unmet'); // placements known, but none in math
   assert.equal(status('20375', ['CPS 112'], {}), 'unknown'); // no placement data at all
   assert.equal(status('20375', [], { MAT: 110 }), 'unmet');
+});
+
+test('prerequisites: says only the missing part, in plain words', () => {
+  // CPS 261: (CPS 112 OR PLACEMENT IN 222) AND (CPS 237 OR MAT 237 )
+  const cps261 = byCrn('20378');
+  const junior = makeRecord(['CPS 111', 'CPS 112', 'MAT 109', 'MAT 110'], { MAT: 109 });
+  assert.deepEqual(missingParts(cps261, junior), ['CPS 237 or MAT 237']);
+  assert.equal(checkPrereq(cps261, junior).reason, 'Needs CPS 237 or MAT 237.');
+  assert.deepEqual(missingParts(cps261, makeRecord([], { MAT: 109 })), ['CPS 112 or placement into 222', 'CPS 237 or MAT 237']);
+  assert.deepEqual(missingParts(cps261, makeRecord(['CPS 112', 'CPS 237'])), []);
+  // CPS 222's compact "CPS112" code reads as "CPS 112".
+  assert.deepEqual(missingParts(byCrn('20375'), makeRecord(['MAT 109'], { MAT: 109 })), ['CPS 112 or placement into 222']);
 });
 
 test('prerequisites: "may be taken concurrently" counts courses planned for the same term', () => {

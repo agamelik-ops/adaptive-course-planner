@@ -112,7 +112,7 @@ export const TOOL_DEFINITIONS = [
               properties: {
                 crn: { type: "string" },
                 requirement: { type: "string", description: "Short label of what it counts toward, e.g. 'Arts' or 'Language (201+)' or 'Exploring economics'." },
-                reason: { type: "string", description: "One sentence on why it fits this student." },
+                reason: { type: "string", description: "Why it fits, under 10 words, e.g. 'Builds on CPS 112' or 'Covers Arts, no prerequisites'." },
               },
               required: ["crn", "requirement", "reason"],
             },
@@ -209,7 +209,8 @@ function prereqTool(args: Record<string, unknown>, ctx: StudentContext) {
   const taken = (ctx.takenCodes ?? []).includes(course.code);
   const result = checkPrereq(course, recordFor(ctx));
   // Real titles for the courses named in the prerequisite, so the AI never guesses them.
-  const mentioned = [...new Set([...course.prereq.toUpperCase().matchAll(/([A-Z]{2,4})\s?(\d{3})/g)].map((m) => `${m[1]} ${m[2]}`))];
+  // (Skip "PLACEMENT IN 222", which isn't a course called "IN 222".)
+  const mentioned = [...new Set([...course.prereq.toUpperCase().replace(/PLACEMENT IN \d{3}/g, "").matchAll(/\b([A-Z]{2,4})\s?(\d{3})/g)].map((m) => `${m[1]} ${m[2]}`))];
   const prerequisite_courses = mentioned.map((code) => {
     const offered = courses.find((item) => item.code === code && !/^lab$/i.test(item.title));
     return `${code}${offered ? ` ${offered.title}` : ""}: ${(ctx.takenCodes ?? []).includes(code) ? "taken" : offered ? "not taken, offered Spring 2027" : "not taken, not offered this spring"}`;

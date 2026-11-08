@@ -6,7 +6,7 @@ import {
   type AuditSummary, type ClassYear,
 } from "../lib/advisor";
 import { makeRecord, parsePlacements } from "../lib/prereqs";
-import { alternativeFor, buildSchedule, inferLanguage, majorPrefixFromProfile, type PickRole, type ScheduleInput } from "../lib/schedule";
+import { alternativeFor, blockedInMajor, buildSchedule, inferLanguage, majorPrefixFromProfile, type PickRole, type ScheduleInput } from "../lib/schedule";
 import { courses as allCourses, meeting, overlaps, subjects, type Course } from "../lib/courses";
 import { classYearFromAudit, parseAudit, readAudit, saveAudit, subscribeAudit, type DegreeAudit } from "../lib/degree-audit";
 import { readPlan, restoreCourses, savePlan } from "../lib/saved-plan";
@@ -15,7 +15,7 @@ type Action =
   | { type: "year"; value: ClassYear }
   | { type: "language"; value: string | null }
   | { type: "major"; value: string | null }
-  | { type: "plan" } | { type: "more" } | { type: "summary" } | { type: "accept-all" } | { type: "paste" };
+  | { type: "plan" } | { type: "more" } | { type: "summary" } | { type: "accept-all" } | { type: "blocked" } | { type: "paste" };
 type Chip = { label: string; action: Action };
 // role: the slot this course fills in the schedule (major, language, requirement, elective).
 // fromAi: picked by the AI outside the schedule builder, so Reject asks the student what they'd prefer.
@@ -58,28 +58,28 @@ async function askAI(history: Message[], context: Record<string, unknown>): Prom
   }
 }
 
-function shortDate(iso: string) {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "recently" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+// Messages stay short: the cards already show each course's details and reason,
+// and the welcome already lists what's needed, so nothing is said twice.
+function needsLine(summary: AuditSummary) {
+  if (!summary.open.length) return "Nothing is marked as still needed.";
+  return `Still needed: ${summary.open.map((need) => need.kind === "major" && need.sources.some((s) => /not declared/i.test(s)) ? "Major (undeclared)" : need.label).join(", ")}.`;
 }
 
+// Full breakdown, only when the student asks "What do I still need?".
 function summaryText(audit: DegreeAudit, summary: AuditSummary) {
-  const lines = [`Here’s what your Degree Works audit (checked ${shortDate(audit.checkedAt)}) shows:`];
-  if (audit.profile?.major) lines.push(`Major: ${audit.profile.major}${audit.profile.minor ? ` · Minor: ${audit.profile.minor}` : ""}`);
-  if (audit.courses?.length) lines.push(`${audit.courses.filter((course) => course.status === "completed").length} completed course records · ${audit.courses.filter((course) => course.status === "in-progress").length} in progress or preregistered.`);
-  if (summary.open.length) {
-    lines.push("", "Still needed:");
-    for (const need of summary.open) {
-      lines.push(`• ${need.label}${need.kind === "major" && need.sources.some((s) => /not declared/i.test(s)) ? " — you haven’t declared a major yet" : ""}`);
-    }
-  } else {
-    lines.push("", "No recognized requirements are marked incomplete in this import.");
-  }
-  if (summary.inProgress.length) lines.push("", `On track once your current classes finish: ${summary.inProgress.map((need) => need.label).join(", ")}.`);
-  if (summary.complete.length) lines.push("", `Done: ${summary.complete.map((need) => need.label).join(", ")}.`);
-  if (summary.open.some((need) => need.kind === "connections")) lines.push("", "Connections seminars aren’t in the Spring schedule, so check with your adviser about that one.");
-  if (audit.partial) lines.push("", "This is a worksheet snapshot and may omit requirements or exceptions. Confirm your remaining requirements with your adviser.");
+  const lines = [needsLine(summary)];
+  if (summary.inProgress.length) lines.push(`In progress: ${summary.inProgress.map((need) => need.label).join(", ")}.`);
+  if (summary.complete.length) lines.push(`Done: ${summary.complete.map((need) => need.label).join(", ")}.`);
+  if (audit.partial) lines.push("This is a partial snapshot, so confirm with your adviser.");
   return lines.join("\n");
+}
+
+// One opening message: class year, declared major and what's still needed.
+function welcomeText(intro: string, audit: DegreeAudit, prefs: Prefs) {
+  const year = YEARS.find((item) => item.value === prefs.classYear)?.label.toLowerCase();
+  const major = majorPrefixFromProfile(audit.profile?.major) ? `${audit.profile?.major} major` : null;
+  const facts = [year, major].filter(Boolean);
+  return `${intro}${facts.length ? ` (${facts.join(", ")})` : ""}.\n${needsLine(summarizeAudit(audit))}`;
 }
 
 export default function ChatWidget() {
@@ -158,25 +158,24 @@ export default function ChatWidget() {
     const current = audit ?? readAudit();
     if (current) {
       setAudit(current);
-      say(`Hi! I’m your planning assistant. ${summaryText(current, summarizeAudit(current))}`);
-      askNext(applyAuditMajor(applyAuditYear(prefs, current), current), current);
+      const next = applyAuditMajor(applyAuditYear(prefs, current), current);
+      say(welcomeText("Hi! I loaded your Degree Works", current, next));
+      askNext(next, current);
     } else {
       say(
-        "Hi! I’m your planning assistant. I don’t have your Degree Works audit yet.\n\nTo import it: open your audit at degreeworks.fandm.edu, click the F&M Course Planner extension, then “Import Degree Works.” Review the preview and confirm the import.\n\nNo extension? You can paste the audit data instead.",
+        "Hi! Import your Degree Works first: open your audit, click the F&M Course Planner extension, then “Import Degree Works.”",
         [{ label: "Paste audit data", action: { type: "paste" } }],
       );
     }
   }
 
   // Use the class level / expected graduation from Degree Works instead of asking.
+  // (The welcome message mentions it; typing "actually I'm a junior" corrects it.)
   function applyAuditYear(base: Prefs, current: DegreeAudit): Prefs {
     const detected = classYearFromAudit(current);
     if (!detected || base.classYear) return base;
     const next = { ...base, classYear: detected };
     setPrefs(next);
-    const label = YEARS.find((year) => year.value === detected)?.label.toLowerCase() ?? detected;
-    const grad = current.profile?.graduationYear;
-    say(`From Degree Works, I see you’re a ${label}${grad ? ` (expected graduation ${grad})` : ""}. If that’s not right, just tell me your class year.`);
     return next;
   }
 
@@ -188,7 +187,6 @@ export default function ChatWidget() {
     if (!declared) return base;
     const next = { ...base, majorPrefix: declared };
     setPrefs(next);
-    say(`Your declared major is ${current.profile?.major}, so I’ll plan around the next courses in it.`);
     return next;
   }
 
@@ -196,10 +194,11 @@ export default function ChatWidget() {
   function handleIncomingAudit(incoming: DegreeAudit | null) {
     setAudit(incoming);
     if (!incoming || !startedRef.current) return;
-    say(`I just received your updated Degree Works audit.\n\n${summaryText(incoming, summarizeAudit(incoming))}`, MENU);
     const waitingForYear = !prefs.classYear;
     const next = applyAuditMajor(applyAuditYear(prefs, incoming), incoming);
-    if (waitingForYear && next.classYear) askNext(next, incoming);
+    const continues = waitingForYear && !!next.classYear;
+    say(welcomeText("I got your updated Degree Works", incoming, next), continues ? undefined : MENU);
+    if (continues) askNext(next, incoming);
   }
 
   // Ask for what's missing (class year, then major, then language if we can't tell), then plan.
@@ -209,20 +208,18 @@ export default function ChatWidget() {
     const upper = nextPrefs.classYear === "JR" || nextPrefs.classYear === "SR";
     if (!nextPrefs.classYear) {
       awaitingRef.current = "year";
-      say("First, what’s your class year? Some sections are closed to certain years.",
+      say("What’s your class year?",
         YEARS.map((year) => ({ label: year.label, action: { type: "year", value: year.value } })));
     } else if (nextPrefs.majorPrefix === undefined) {
       awaitingRef.current = "major";
-      say(upper
-        ? "Degree Works doesn’t show a declared major for you. What’s your major (or the one you’re planning to declare)? I’ll plan the next courses in it."
-        : "At F&M you declare a major in the spring of sophomore year, so it’s normal not to have one yet. What are you thinking of majoring in? I’ll include the next courses for it, or tap “Not sure yet” and I’ll suggest intro courses to explore. (You can type any subject.)",
+      say(upper ? "What’s your major?" : "What major are you thinking about? Not sure is fine.",
         [
           ...Object.entries(MAJOR_OPTIONS).map(([prefix, name]) => ({ label: name, action: { type: "major" as const, value: prefix } })),
           { label: "Not sure yet", action: { type: "major", value: null } },
         ]);
     } else if (open.some((need) => need.kind === "language") && nextPrefs.languagePrefix === undefined && !inferLanguage(studentRecord(currentAudit))) {
       awaitingRef.current = "language";
-      say("You still need language study through the 201 level, and I can’t tell from Degree Works which language you’re in. Which one are you studying or planning to start?", [
+      say("Which language are you studying (or starting)?", [
         ...Object.entries(LANGUAGE_SUBJECTS).map(([prefix, name]) => ({ label: name, action: { type: "language" as const, value: prefix } })),
         { label: "Not sure", action: { type: "language", value: null } },
       ]);
@@ -240,24 +237,24 @@ export default function ChatWidget() {
     const created: Suggestion[] = result.picks.map((pick) => ({ id: nextId.current++, label: pick.label, role: pick.role, course: pick.course, reason: pick.reason, status: "pending" }));
     setSuggestions((current) => [...current, ...created]);
 
-    const lines: string[] = [];
-    if (created.length) {
-      const total = base.plan.length + created.length;
-      lines.push(more ? "Here are a couple more options that fit your schedule:"
-        : `Here’s a ${total}-course plan for Spring 2027 based on what you’ve taken${nextPrefs.majorPrefix ? ` and your ${subjects[nextPrefs.majorPrefix] ?? nextPrefs.majorPrefix} major` : ""}. Every course fits your prerequisites and schedule. Accept the ones you like and they’ll go on your calendar; reject one and I’ll swap in another.`);
-    } else {
-      lines.push(more ? "I don’t have more options that fit around your current plan." : "I couldn’t find courses that fit around your current plan.");
-    }
-    if (result.blocked.length) {
-      lines.push(`Not yet eligible in ${subjects[nextPrefs.majorPrefix ?? ""] ?? "your major"}:\n${result.blocked.map(({ course, reason }) => `• ${course.code} ${course.title}: ${reason.replace(/^Needs /, "needs ")}`).join("\n")}`);
-    }
-    if (!nextPrefs.majorPrefix && majorStillOpen(currentAudit)) lines.push("Once you have a major in mind, tell me (e.g. “I’m thinking economics”) and I’ll rebuild the plan around it.");
-    lines.push(...result.notes);
-    say(lines.join("\n\n"),
-      created.length ? [{ label: "Accept all", action: { type: "accept-all" } }, { label: "Suggest more", action: { type: "more" } }, MENU[0]] : MENU,
-      created.map((item) => item.id));
+    // One line; each card carries its own reason. Courses they can't take yet
+    // only come up if they tap "What can't I take yet?".
+    const majorName = nextPrefs.majorPrefix ? subjects[nextPrefs.majorPrefix] ?? nextPrefs.majorPrefix : null;
+    let text: string;
+    if (created.length) text = more ? "A few more options:" : majorName ? `Here’s your plan, built around ${majorName}.` : "Here’s your plan.";
+    else text = more ? "Nothing else fits around your plan." : "";
+    if (!more) text = [text, ...result.notes].filter(Boolean).join("\n") || "Nothing fits around your current plan.";
+    const chips: Chip[] = created.length ? [{ label: "Accept all", action: { type: "accept-all" } }, { label: "Suggest more", action: { type: "more" } }] : [...MENU];
+    if (!more && result.blocked.length) chips.push({ label: "What can’t I take yet?", action: { type: "blocked" } });
+    say(text, chips, created.map((item) => item.id));
   }
-  function majorStillOpen(currentAudit: DegreeAudit) { return summarizeAudit(currentAudit).open.some((need) => need.kind === "major"); }
+
+  function showBlocked() {
+    const blocked = blockedInMajor(scheduleInput(prefs));
+    say(blocked.length
+      ? `Not yet:\n${blocked.map(({ course, reason }) => `• ${course.code} ${course.title}: ${reason.replace(/^Needs /, "needs ")}`).join("\n")}`
+      : "Nothing in your major is blocked right now.", MENU);
+  }
 
   function accept(id: number) {
     const item = suggestions.find((entry) => entry.id === id);
@@ -265,7 +262,7 @@ export default function ChatWidget() {
     const plan = currentPlan();
     const clash = plan.find((course) => overlaps(course, item.course));
     if (clash) {
-      say(`${item.course.code} now overlaps with ${clash.code} in your plan, so I didn’t add it. Remove ${clash.code} first, or reject this one for an alternative.`);
+      say(`${item.course.code} overlaps with ${clash.code} in your plan.`);
       return;
     }
     if (!plan.some((course) => course.crn === item.course.crn)) savePlan([...plan, item.course]);
@@ -283,7 +280,7 @@ export default function ChatWidget() {
     }
     savePlan(plan);
     setSuggestions((current) => current.map((entry) => added.includes(entry.id) ? { ...entry, status: "accepted" } : entry));
-    say(added.length ? `Added ${added.length} course${added.length === 1 ? "" : "s"} to your calendar.` : "Nothing new to add. Everything is already decided or would overlap.", MENU);
+    say(added.length ? `Added ${added.length} course${added.length === 1 ? "" : "s"}.` : "Nothing new to add.", MENU);
   }
 
   function reject(id: number) {
@@ -296,12 +293,12 @@ export default function ChatWidget() {
     if (alternative) {
       const next: Suggestion = { id: nextId.current++, label: alternative.label, role: alternative.role, course: alternative.course, reason: alternative.reason, status: "pending" };
       setSuggestions([...updated, next]);
-      say(`No problem. Here’s another option for ${item.label}:`, undefined, [next.id]);
+      say("Try this instead:", undefined, [next.id]);
     } else {
       setSuggestions(updated);
       say(item.fromAi || !item.role
-        ? `Okay, I’ve skipped ${item.course.code}. Tell me what you’d prefer instead (a different time, subject or professor) and I’ll look again.`
-        : `That was the only option for ${item.label} that fits your prerequisites and schedule right now.`, MENU);
+        ? "Skipped. What would you like instead?"
+        : `No other ${item.label} option fits right now.`, MENU);
     }
   }
 
@@ -314,7 +311,8 @@ export default function ChatWidget() {
       case "more": buildPlan(prefs, true); break;
       case "summary": if (audit && summary) say(summaryText(audit, summary), MENU); else start(); break;
       case "accept-all": acceptAll(); break;
-      case "paste": setPasting(true); say("Paste the audit JSON below (the degreeAudit object from the extension) and press Enter."); break;
+      case "blocked": showBlocked(); break;
+      case "paste": setPasting(true); say("Paste the degreeAudit JSON and press Enter."); break;
     }
   }
 
@@ -336,10 +334,11 @@ export default function ChatWidget() {
         setPasting(false);
         saveAudit(parsed);
         setAudit(parsed);
-        say(`Got it! ${summaryText(parsed, summarizeAudit(parsed))}`);
-        askNext(applyAuditYear(prefs, parsed), parsed);
+        const next = applyAuditMajor(applyAuditYear(prefs, parsed), parsed);
+        say(welcomeText("Got it, I loaded your Degree Works", parsed, next));
+        askNext(next, parsed);
       } else {
-        say("That doesn’t look like a Degree Works audit. It should be JSON with a “requirements” list.");
+        say("That isn’t Degree Works audit data.");
       }
       return;
     }
@@ -357,7 +356,7 @@ export default function ChatWidget() {
     // Correcting a detected class year, e.g. "actually I'm a sophomore".
     if (year && prefs.classYear && year !== prefs.classYear && /i'?m an?\b|i am an?\b|actually|class year/.test(lower)) {
       setPrefs({ ...prefs, classYear: year });
-      return say(`Got it, I’ll plan for a ${YEARS.find((item) => item.value === year)?.label.toLowerCase()} from now on.`, MENU);
+      return say(`Got it, planning for a ${YEARS.find((item) => item.value === year)?.label.toLowerCase()}.`, MENU);
     }
     if (audit && awaiting === "major" && (major || notSure)) return run({ type: "major", value: notSure ? null : major });
     if (audit && awaiting === "language" && (language || notSure)) return run({ type: "language", value: notSure ? null : language });
@@ -365,8 +364,7 @@ export default function ChatWidget() {
     if (audit && major && prefs.classYear && /major|thinking|interested|leaning|switch|instead/.test(lower)) {
       const next = { ...prefs, majorPrefix: major };
       setPrefs(next);
-      say(`Got it, I’ll plan around ${subjects[major] ?? major}.`);
-      return buildPlan(next);
+      return buildPlan(next); // its message names the major
     }
 
     // Everything else goes to the AI, which can search the real catalog.
@@ -381,7 +379,7 @@ export default function ChatWidget() {
     if (/more|another|other option|else/.test(lower)) return run({ type: "more" });
     if (/plan|recommend|suggest|outline|schedule|what should i take/.test(lower)) return run({ type: "plan" });
     if (result.kind === "not-configured") {
-      say("I can’t answer open-ended questions until the AI is set up. For now I can show what you still need and build a plan from it.", audit ? MENU : undefined);
+      say("I need the AI for that, but I can show what you still need or build a plan.", audit ? MENU : undefined);
     }
   }
 
@@ -458,7 +456,6 @@ export default function ChatWidget() {
                       <p className="suggestion-meta">{meeting(item.course)}</p>
                       <p className="suggestion-meta">CRN {item.course.crn}{item.course.instructors.length ? ` · ${item.course.instructors.join(", ")}` : ""}</p>
                       <p className="suggestion-reason">{item.reason}</p>
-                      {item.course.prereq && <p className="suggestion-prereq">Prerequisite: {item.course.prereq}</p>}
                       {item.status === "pending" ? (
                         <div className="suggestion-actions">
                           <button className="accept" onClick={() => accept(sid)}>Accept</button>

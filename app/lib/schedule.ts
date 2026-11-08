@@ -104,12 +104,12 @@ function candidates(request: Request, input: ScheduleInput, chosen: Course[]): {
       case "major":
       case "support": {
         if (!request.subjects?.includes(prefix)) continue;
-        if (takenRefs.length) { score += 6; reason = `Next step in ${subjectName(prefix)}: builds on ${takenRefs.join(", ")}.`; }
-        else if (!course.prereq && !sameSubjectTaken.length) { score += 4; reason = `Entry point into ${subjectName(prefix)}.`; }
-        else { score += 1; reason = `Builds toward the ${subjectName(prefix)} ${request.role === "major" ? "major" : "requirements for your major"}.`; }
+        // The card's label already names the subject/major, so the reason stays short.
+        if (takenRefs.length) { score += 6; reason = `Next step: builds on ${takenRefs.join(", ")}.`; }
+        else if (!course.prereq && !sameSubjectTaken.length) { score += 4; reason = "Starting course, no prerequisites."; }
+        else { score += 1; reason = request.role === "major" ? "Next course for the major." : "Often required for this major."; }
         if (!upper && level < 200) score += 1;
         score -= level / 100;
-        if (request.role === "support") reason = `${reason} Commonly required for ${subjectName(input.majorPrefix ?? "")} majors.`;
         break;
       }
       case "language": {
@@ -120,9 +120,7 @@ function candidates(request: Request, input: ScheduleInput, chosen: Course[]): {
         const current = languageLevel(record, target);
         if (current && level < current) continue; // never step backwards
         score -= level / 100; // the lowest eligible level is the next one in the sequence
-        reason = level >= 201
-          ? `Counts toward your language requirement (${subjectName(target)} at the 201+ level).`
-          : `Next step toward the 201-level language requirement (${subjectName(target)} ${level}).`;
+        reason = level >= 201 ? "Meets the language requirement." : `Next step toward ${target} 201.`;
         break;
       }
       case "requirement": {
@@ -130,7 +128,7 @@ function candidates(request: Request, input: ScheduleInput, chosen: Course[]): {
         if (!tags.some((tag) => course.dist.includes(tag))) continue;
         const bonusTags = course.dist.filter((tag) => openTags.has(tag) && !tags.includes(tag));
         score += bonusTags.length + (course.prereq ? 0 : 1) + (majorSubjects.has(prefix) ? 2 : 0) - level / 100;
-        reason = `Counts toward ${request.label}${bonusTags.length ? ` (also ${bonusTags.join(", ")})` : ""}.`;
+        reason = bonusTags.length ? `Also counts toward ${bonusTags.join(", ")}.` : "Meets this requirement.";
         break;
       }
       case "elective": {
@@ -140,14 +138,14 @@ function candidates(request: Request, input: ScheduleInput, chosen: Course[]): {
         // Undeclared students: favor intro courses that let them try out a possible major.
         const exploring = !input.majorPrefix && level < 200 && /^(intro|introduction|elementary|principles|fundamentals)|\bintro\b/i.test(course.title);
         score += (majorSubjects.has(prefix) ? 3 : 0) + 2 * covers.length + (exploring ? 2 : 0) + (course.prereq ? 0 : 1) - (chosenSubjects.has(prefix) ? 4 : 0) - level / 100;
-        reason = majorSubjects.has(prefix) ? `Elective in ${subjectName(prefix)}, related to your major.`
-          : covers.length ? `Elective that also counts toward ${covers.join(", ")}.`
-          : exploring ? `Intro course to explore ${subjectName(prefix)} as a possible major.`
+        reason = majorSubjects.has(prefix) ? "Related to your major."
+          : covers.length ? `Also counts toward ${covers.join(", ")}.`
+          : exploring ? `Try out ${subjectName(prefix)} as a possible major.`
           : `Open elective in ${subjectName(prefix)}.`;
         break;
       }
     }
-    if (hasSeparateLab(course)) reason += " Register for a lab section too.";
+    if (hasSeparateLab(course)) reason += " Needs a lab section too.";
     if (prereq.status === "unknown") reason += ` ${prereq.reason}`;
     results.push({ course, score, reason, prereq: prereq.status });
   }
@@ -166,7 +164,7 @@ function requestsFor(input: ScheduleInput): { requests: Request[]; notes: string
   if (input.openNeeds.some((need) => need.kind === "language")) {
     const language = input.languagePrefix ?? inferLanguage(input.record);
     if (language) requests.push({ role: "language", label: "Language", subjects: [language] });
-    else notes.push("Tell me which language you're studying (or plan to start) and I'll add the right course for the language requirement.");
+    else notes.push("Tell me which language you're studying and I'll add a language course.");
   }
   for (const need of input.openNeeds) if (need.kind === "dist") requests.push({ role: "requirement", label: need.label, need });
   if (major) {
@@ -174,7 +172,7 @@ function requestsFor(input: ScheduleInput): { requests: Request[]; notes: string
     else if (support.length) requests.push({ role: "support", label: `${subjectName(support[0])} for ${majorLabel}`, subjects: support });
     else requests.push({ role: "major", label: majorLabel, subjects: [major] });
   }
-  if (input.openNeeds.some((need) => need.kind === "connections")) notes.push("Connections seminars aren't in the Spring schedule, so check with your adviser about that requirement.");
+  if (input.openNeeds.some((need) => need.kind === "connections")) notes.push("Connections seminars aren't offered this spring, so ask your adviser.");
   return { requests, notes };
 }
 
@@ -194,9 +192,9 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
       if (request.role === "language") {
         const prefix = request.subjects![0];
         const level = languageLevel(input.record, prefix);
-        notes.push(`No ${subjectName(prefix)} course at your level${level ? ` (${prefix} ${level})` : ""} fits this spring. Some levels are only taught in the fall, so check with the language department.`);
+        notes.push(`No ${subjectName(prefix)} course at your level${level ? ` (after ${prefix} ${level})` : ""} is offered this spring.`);
       } else if (request.role === "major" && !picks.some((pick) => pick.role === "major")) {
-        notes.push(`No ${request.label} course you're eligible for fits around your plan this spring.`);
+        notes.push(`No ${request.label} course you can take fits this spring.`);
       }
       continue;
     }
@@ -206,7 +204,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
   // Fill the remaining slots with electives.
   while (picks.length < slots) {
     const [best] = candidates({ role: "elective", label: "Elective" }, input, chosen);
-    if (!best) { notes.push("I couldn't find more courses that fit around your schedule."); break; }
+    if (!best) { notes.push("Nothing else fits around your schedule."); break; }
     picks.push({ course: best.course, role: "elective", label: "Elective", reason: best.reason, prereq: best.prereq });
     chosen.push(best.course);
   }

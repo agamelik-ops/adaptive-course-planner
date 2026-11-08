@@ -140,18 +140,72 @@ function parse(tokens: Token[]): Value {
   return expr();
 }
 
+function evaluate(text: string, course: Course, record: StudentRecord): Value {
+  // "A; OR B; OR C" is a list of alternatives.
+  let value: Value = false;
+  for (const alternative of text.split(/;\s*OR\s+/i)) {
+    const special = specialRule(alternative, course, record);
+    value = or(value, special !== undefined ? special : parse(tokenize(alternative, course, record)));
+  }
+  return value;
+}
+
+// "(A OR B) AND (C OR D)" -> ["(A OR B)", "(C OR D)"]: the AND-ed parts at the outer level.
+function topLevelParts(text: string): string[] {
+  const parts: string[] = [];
+  const upper = text.toUpperCase();
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && upper.startsWith("AND", i) && /[\s)]/.test(text[i - 1] ?? "") && /[\s(]/.test(text[i + 3] ?? "")) {
+      parts.push(text.slice(start, i));
+      start = i + 3;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
+// True for "(A OR B)" but not "(A) OR (B)".
+function wrappedInParens(text: string) {
+  if (!text.startsWith("(") || !text.endsWith(")")) return false;
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")" && --depth === 0 && i < text.length - 1) return false;
+  }
+  return true;
+}
+
+// "(CPS 237 OR MAT 237 )" -> "CPS 237 or MAT 237"
+function readable(part: string) {
+  let text = part.trim();
+  if (wrappedInParens(text)) text = text.slice(1, -1);
+  return text.replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim()
+    .replace(/([A-Z]{2,4})(\d{3})/g, "$1 $2")
+    .replace(/\(MAY BE TAKEN CONCURRENTLY\)/gi, "(can be taken at the same time)")
+    .replace(/PLACEMENT IN (\d{3})/gi, "placement into $1")
+    .replace(/\bOR\b/g, "or").replace(/\bAND\b/g, "and");
+}
+
+/** The parts of a prerequisite the student is still missing, in plain words, e.g. ["CPS 237 or MAT 237"]. */
+export function missingParts(course: Course, record: StudentRecord): string[] {
+  const text = course.prereq?.trim();
+  if (!text || /;\s*OR\s+/i.test(text)) return [];
+  return topLevelParts(text).filter((part) => evaluate(part, course, record) === false).map(readable);
+}
+
 /** Can this student take `course` in Spring, given what they've taken and planned? */
 export function checkPrereq(course: Course, record: StudentRecord): PrereqResult {
   const text = course.prereq?.trim();
   if (!text) return { status: "met", reason: "No prerequisites." };
-  // "A; OR B; OR C" is a list of alternatives.
-  const alternatives = text.split(/;\s*OR\s+/i);
-  let value: Value = false;
-  for (const alternative of alternatives) {
-    const special = specialRule(alternative, course, record);
-    value = or(value, special !== undefined ? special : parse(tokenize(alternative, course, record)));
-  }
+  const value = evaluate(text, course, record);
   if (value === true) return { status: "met", reason: `Prerequisite met (${text}).` };
-  if (value === false) return { status: "unmet", reason: `Needs ${text}.` };
+  if (value === false) {
+    const missing = missingParts(course, record);
+    return { status: "unmet", reason: `Needs ${missing.length ? missing.join(" and ") : text}.` };
+  }
   return { status: "unknown", reason: /PERMISSION/i.test(text) ? `May need instructor permission (${text}).` : `Check the prerequisite: ${text}.` };
 }

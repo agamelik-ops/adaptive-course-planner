@@ -47,7 +47,7 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .plan-totals { display: flex; justify-content: space-between; font-size: 11px; padding-bottom: 16px; border-bottom: 1px solid #eef0ed; }
 .plan-totals span { color: #77828a; }
 .empty-selection { font-size: 12px; color: #859096; line-height: 1.8; margin: 16px 0 0; }
-.selected-list { display: grid; gap: 8px; margin-top: 15px; }
+.selected-list { display: grid; gap: 8px; margin-top: 15px; max-height: 440px; overflow-y: auto; overscroll-behavior: contain; padding-right: 5px; }
 .selected-course { padding: 11px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .selected-course strong { display: block; font-size: 11px; }.selected-course span { display: block; font-size: 10px; margin-top: 4px; }
 .selected-course button { background: transparent; border: 0; font-size: 22px; padding: 3px 6px; }
@@ -120,6 +120,10 @@ h3 { margin: 7px 0 6px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .course-details { position: fixed; inset: 0; margin: auto; width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; border: 1px solid #dce4e9; border-radius: 14px; padding: 26px; background: white; color: #203449; box-shadow: 0 24px 90px #142a4550; }
 .course-details::backdrop { background: #12283e60; backdrop-filter: blur(3px); }
 .details-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.details-actions { display: flex; align-items: center; gap: 8px; }
+.details-add { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #cfdae1; border-radius: 50%; background: white; color: #20496b; font-size: 20px; transition: background .15s ease, transform .15s ease; }
+.details-add:hover:not(:disabled) { background: #e9f1f8; transform: scale(1.08); }
+.details-add:disabled { cursor: default; background: #edf3ef; border-color: #edf3ef; color: #497451; font-size: 14px; }
 .details-close { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #e3e9ed; border-radius: 50%; background: #f7f9fa; color: #607787; font-size: 22px; }
 .course-details h2 { font-size: 22px; line-height: 1.3; }
 .details-section { font-size: 11px; color: #70828f; margin: 9px 0; }

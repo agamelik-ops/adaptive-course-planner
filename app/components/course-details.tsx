@@ -9,7 +9,13 @@ const classYears: Record<string, string> = {
   FR: "First-year students", SO: "Sophomores", JR: "Juniors", SR: "Seniors",
 };
 
-export default function CourseDetails({ course, availability, onClose }: { course: Course; availability?: Availability; onClose: () => void }) {
+export default function CourseDetails({ course, availability, onClose, added = false, onAdd }: {
+  course: Course;
+  availability?: Availability;
+  onClose: () => void;
+  added?: boolean; // already in the student's plan
+  onAdd?: () => void; // omitted while the saved plan is still loading
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -28,7 +34,23 @@ export default function CourseDetails({ course, availability, onClose }: { cours
         if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) event.currentTarget.close();
       }
     }}>
-      <div className="details-topline"><span className={`course-code ${course.color}`}>{course.code}</span><button className="details-close" aria-label="Close course details" onClick={() => dialogRef.current?.close()}>×</button></div>
+      <div className="details-topline">
+        <span className={`course-code ${course.color}`}>{course.code}</span>
+        <div className="details-actions">
+          {(onAdd || added) && (
+            <button
+              className="details-add"
+              disabled={added}
+              aria-label={added ? `${course.code} is in your plan` : `Add ${course.code} to your plan`}
+              title={added ? "In your plan" : "Add to your plan"}
+              onClick={onAdd}
+            >
+              {added ? "✓" : "+"}
+            </button>
+          )}
+          <button className="details-close" aria-label="Close course details" onClick={() => dialogRef.current?.close()}>×</button>
+        </div>
+      </div>
       <h2 id="course-details-title">{course.title}</h2>
       <p className="details-section">Spring 2027 · CRN {course.crn}{course.section ? ` · Section ${course.section}` : ""}</p>
       <p className="details-meetings">{meeting(course)}</p>

@@ -802,6 +802,8 @@ export default function Planner() {
           availability={availability[detailCourse.crn]}
           course={detailCourse}
           onClose={() => setDetailCourse(null)}
+          added={selected.some((item) => item.crn === detailCourse.crn)}
+          onAdd={loading ? undefined : () => add(detailCourse)}
         />
       )}
     </>

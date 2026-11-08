@@ -1,10 +1,7 @@
-import type { Metadata } from "next";
-import Planner from "./planner";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Prospective Course Planner"
-};
-
+// The planner lives on the homepage. This folder only holds the course data
+// (courses.json / courses.ts); old /planner links are sent to the homepage.
 export default function PlannerPage() {
-  return <Planner />;
+  redirect("/");
 }
