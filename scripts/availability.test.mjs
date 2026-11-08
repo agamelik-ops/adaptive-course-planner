@@ -40,7 +40,8 @@ test('planner bridge writes snapshots and notifies the open planner',async()=>{
     chrome:{storage:{local:{get:async()=>({'fm-availability:spring-2027:v1':snapshot})},onChanged:{addListener:fn=>{listener=fn;}}}},
     localStorage:{getItem:()=>null,setItem:(key,value)=>{written[key]=value;}},window:{addEventListener(){},dispatchEvent:()=>{notified=true;}},Event,
   });
-  await Promise.resolve();
+  // The bridge reads storage in a few async steps; let them all finish before checking.
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(JSON.parse(written['fm-availability:spring-2027:v1']).records[0].crn,'20277');assert(notified);assert.equal(typeof listener,'function');
 });
 
