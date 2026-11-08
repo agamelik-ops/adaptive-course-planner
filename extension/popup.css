@@ -3,3 +3,7 @@ body{width:300px;padding:20px;margin:0;font:13px Arial,sans-serif;color:#203449;
 button + button{margin-top:9px}button[hidden]{display:none}
 
 .connection-card{background:white;border:1px solid #dde6ec;border-radius:9px;padding:12px;margin:0 0 16px}.connection-pill{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px}.connection-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#98a7b2;flex-shrink:0}.connection-pill.connected{color:#376a50}.connection-pill.connected::before{background:#4b966c}.connection-pill.connecting{color:#8b6d2e}.connection-pill.connecting::before{background:#c39741}#last-sync{font-size:10px;margin:7px 0 0;line-height:1.5}button[hidden]{display:none}
+
+#audit-status{font-size:10px;line-height:1.6;margin:9px 2px 14px;color:#647d8d}
+
+.audit-connection{margin-top:20px;margin-bottom:10px}#audit-summary{font-size:11px;line-height:1.6;margin:8px 0 0}#audit-note{font-size:10px;line-height:1.5;color:#80929e;margin:5px 0 0}

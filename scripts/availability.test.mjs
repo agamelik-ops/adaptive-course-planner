@@ -111,7 +111,7 @@ test('automatic scheduler refreshes immediately, schedules next pass, and pauses
     permissions:{contains:async()=>true},
     tabs:{create:async()=>({id:1}),get:async id=>({id,url:'https://prd-reg9.fandm.edu/StudentRegistrationSsb/ssb/classSearch/classSearch'}),onRemoved:{addListener:fn=>handlers.removed=fn},onUpdated:{addListener:fn=>handlers.updated=fn}},
     scripting:{executeScript:async()=>{scans++;values['fm-availability-sync']={state:'complete'};}},
-    runtime:{id:'test',onMessage:{addListener:fn=>handlers.message=fn},onStartup:{addListener:fn=>handlers.startup=fn},onInstalled:{addListener:fn=>handlers.installed=fn}}
+    runtime:{id:'test',onMessage:{addListener:fn=>{const previous=handlers.message;handlers.message=(...args)=>{previous?.(...args);return fn(...args);};}},onStartup:{addListener:fn=>handlers.startup=fn},onInstalled:{addListener:fn=>handlers.installed=fn}}
   };
   vm.runInNewContext(fs.readFileSync(new URL('../extension/background.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),{chrome,syncAllAvailability,URL});
   const reply=await new Promise(resolve=>handlers.message({type:'connect-fm'},{id:'test'},resolve));
@@ -166,15 +166,16 @@ test('merged extension preserves Degree Works import approval and availability p
   const html=fs.readFileSync(new URL('../extension/popup.html',import.meta.url),'utf8');
   assert(html.includes('id="sync"'));assert(html.includes('id="audit"'));
   const source=fs.readFileSync(new URL('../extension/degree-audit.mjs',import.meta.url),'utf8');
-  assert(source.includes('const approved = confirm('));assert(source.includes('if (!approved) return null;'));
-  let returnedAudit=null,writes=0,opened=0;
-  const chrome={scripting:{executeScript:async()=>[{result:returnedAudit}]},storage:{local:{set:async data=>{writes++;assert.equal(data.degreeAudit,returnedAudit);}}},tabs:{create:async()=>{opened++;}}};
-  const importer=vm.runInNewContext(source.replace('export async function','async function')+'\nimportDegreeAudit;', {chrome,URL});
+  assert(source.includes('if (!approved) return false;'));
+  let approved=false,writes=0,opened=0;
+  const returnedAudit={version:2,partial:true,requirements:[{name:'Example requirement',status:'incomplete'}],courses:[]};
+  const chrome={scripting:{executeScript:async options=>[{result:options.args?approved:returnedAudit}]},storage:{local:{set:async data=>{writes++;assert.equal(data.degreeAudit,returnedAudit);}}},tabs:{create:async()=>{opened++;}}};
+  const importer=vm.runInNewContext(source.replaceAll('export async function','async function')+'\nimportDegreeAudit;', {chrome,URL});
   const tab={id:1,url:'https://degreeworks.fandm.edu/'};
   assert.equal(await importer(tab),false);assert.equal(writes,0);
-  returnedAudit={version:1,partial:true,requirements:[{name:'Example requirement',status:'incomplete'}]};
-  assert.equal(await importer(tab),true);assert.equal(writes,1);assert.equal(opened,1);
-  await assert.rejects(()=>importer({id:1,url:'https://example.com/'}),/Degree Works audit/);
+  approved=true;
+  assert.equal((await importer(tab)).requirements,1);assert.equal(writes,1);assert.equal(opened,1);
+  await assert.rejects(()=>importer({id:1,url:'https://example.com/'}),/Academic worksheet/);
 });
 
 

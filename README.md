@@ -73,3 +73,15 @@ Checks: `node --test scripts/availability.test.mjs`, `npm run lint`, and `npx ts
 The extension popup also retains **Import Degree Works requirements**. Open your Degree Works audit, expand the relevant sections, and use that button. The original preview/confirmation is preserved; only approved requirement names and statuses are stored locally as a partial audit. Availability connection and Degree Works import remain separate actions.
 
 The popup displays Connecting while setup/initial import is underway, Connected to F&M after a successful sync, and Not connected for paused or overdue updates. It shows the last successful sync time and completed section count; the Connect button is replaced by Disconnect while connected.
+
+## Degree Works academic import
+
+On the **Academic** worksheet at degreeworks.fandm.edu, click the extension → **Import Degree Works**. It expands academic blocks, reads structured requirements and course tables, and presents an import preview. Confirm in the Degree Works tab. The background worker saves the approved snapshot even if the popup closes, and the existing bridge delivers it to the planner. Refresh localhost after reloading the extension.
+
+Version 2 includes degree, major/minor/concentration, placement results, earned credits, anticipated graduation year, catalog-year blocks, requirement status/detail text, and deduplicated course records with title, grade, credits, term, and completion status where available. Student name and ID are excluded. “In progress” includes preregistered classes. Unsupported grades remain unknown. Worksheet imports are always marked potentially partial; inaccessible blocks and exceptions are not claimed complete.
+
+The popup reports imported course/requirement counts and time. The current local rules-based assistant receives the richer audit and excludes completed/in-progress courses from suggestions. It does not yet verify all prerequisites, evaluate every major requirement, or send audit data to an external AI service. Legacy requirement-only imports still work; reimport to include course history.
+
+Check with `node --test scripts/degree-audit.test.mjs scripts/availability.test.mjs`, lint, and TypeScript. Then reload the extension, import your own worksheet, verify the preview/counts against Degree Works, and open the assistant to check its loaded-audit summary.
+
+Degree Works has its own popup status card: Not linked before an import, Importing during extraction/preview, and Linked once a usable audit is saved. It displays course/requirement counts, the import time, and a saved-snapshot label. Update Degree Works refreshes the snapshot; a failed/cancelled update preserves the last usable audit. This badge does not imply a live Degree Works login or automatic academic-record syncing.

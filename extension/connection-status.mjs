@@ -15,3 +15,17 @@ export function connectionView(auto, job, now = Date.now()) {
     total: job?.state === "complete" ? job.scanned : null,
   };
 }
+
+// Linked means a usable local audit exists, not an authenticated live session.
+export function degreeWorksView(audit, job, now = Date.now()) {
+  const linked = Array.isArray(audit?.requirements) && audit.requirements.some((item) => typeof item?.name === "string" && item.name.trim()) && Number.isFinite(Date.parse(audit.checkedAt));
+  const importing = job?.state === "importing" && now - job.updatedAt < 300000;
+  return {
+    linked, importing,
+    state: importing ? "connecting" : linked ? "connected" : "disconnected",
+    label: importing ? "Importing Degree Works…" : linked ? "Degree Works linked" : "Degree Works not linked",
+    detail: linked ? `${audit.courses?.length ?? 0} courses · ${audit.requirements.length} requirements · Imported ${new Date(audit.checkedAt).toLocaleString()}` : "Import your Academic worksheet to use it for recommendations.",
+    note: importing ? "Review the import preview in your Degree Works tab." : linked ? "Saved audit snapshot · Reimport after your record changes" : "No audit has been imported yet.",
+    button: importing ? "Importing…" : linked ? "Update Degree Works" : "Import Degree Works",
+  };
+}

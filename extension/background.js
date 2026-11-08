@@ -1,3 +1,4 @@
+import { importDegreeAudit } from "./degree-audit.mjs";
 import { syncAllAvailability } from "./full-sync.mjs";
 
 const autoKey = "fm-availability-auto";
@@ -92,3 +93,24 @@ chrome.tabs.onUpdated.addListener(async (tabId, change) => {
 });
 chrome.runtime.onStartup.addListener(() => { void pause("Updates paused after browser restart. Reconnect Browse Classes."); });
 chrome.runtime.onInstalled.addListener(() => { void pause("Click Connect to F&M to start automatic availability updates."); });
+
+// Keep the approved import alive if the extension popup loses focus.
+let auditImportBusy = false;
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || message?.type !== "import-degree-works") return;
+  (async () => {
+    if (auditImportBusy) throw new Error("A Degree Works import is already in progress.");
+    auditImportBusy = true;
+    try {
+      await chrome.storage.local.set({ degreeAuditImport: { state: "importing", updatedAt: Date.now(), message: "Reading Degree Works. Review the preview in that tab." } });
+      const result = await importDegreeAudit(await chrome.tabs.get(message.tabId));
+      await chrome.storage.local.set({ degreeAuditImport: { state: result ? "complete" : "cancelled", updatedAt: Date.now(), message: result ? "Degree Works updated. Your planner can use the saved audit." : "Import cancelled. Your previous saved audit is unchanged." } });
+      respond({ result });
+    } catch (error) {
+      const message = error.message || "Degree Works import failed.";
+      await chrome.storage.local.set({ degreeAuditImport: { state: "error", updatedAt: Date.now(), message } });
+      respond({ error: message });
+    } finally { auditImportBusy = false; }
+  })().catch((error) => respond({ error: error.message }));
+  return true;
+});

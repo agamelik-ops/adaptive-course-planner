@@ -1,5 +1,4 @@
-import { connectionView } from "./connection-status.mjs";
-import { importDegreeAudit } from "./degree-audit.mjs";
+import { connectionView, degreeWorksView } from "./connection-status.mjs";
 
 const status = document.getElementById("status");
 const start = document.getElementById("sync");
@@ -7,7 +6,17 @@ const stop = document.getElementById("cancel");
 const autoKey = "fm-availability-auto";
 const jobKey = "fm-availability-sync";
 async function render() {
-  const saved = await chrome.storage.local.get([autoKey, jobKey]);
+  const saved = await chrome.storage.local.get([autoKey, jobKey, "degreeAudit", "degreeAuditImport"]);
+  const audit = saved.degreeAudit;
+  const auditView = degreeWorksView(audit, saved.degreeAuditImport);
+  const auditPill = document.getElementById("audit-connection");
+  auditPill.textContent = auditView.label;
+  auditPill.className = `connection-pill ${auditView.state}`;
+  document.getElementById("audit-summary").textContent = auditView.detail;
+  document.getElementById("audit-note").textContent = auditView.note;
+  document.getElementById("audit").textContent = auditView.button;
+  document.getElementById("audit").disabled = auditView.importing;
+  document.getElementById("audit-status").textContent = saved.degreeAuditImport?.message || "";
   const auto = saved[autoKey];
   const job = saved[jobKey];
   const view = connectionView(auto, job);
@@ -47,11 +56,13 @@ document.getElementById("open").addEventListener("click", () => chrome.tabs.crea
 const auditButton = document.getElementById("audit");
 auditButton.addEventListener("click", async () => {
   auditButton.disabled = true;
+  auditButton.textContent = "Importing…";
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const imported = await importDegreeAudit(tab);
-    status.textContent = imported ? "Degree Works requirements imported locally." : "No requirements imported. You can try again from your expanded Degree Works audit.";
+    const response = await chrome.runtime.sendMessage({ type: "import-degree-works", tabId: tab?.id });
+    if (response?.error) throw new Error(response.error);
+    document.getElementById("audit-status").textContent = response.result ? `Degree Works imported · ${response.result.courses} courses · ${response.result.requirements} requirements` : "Import cancelled. Your saved audit was not changed.";
   } catch (error) {
-    status.textContent = error instanceof Error ? error.message : "Could not import requirements.";
-  } finally { auditButton.disabled = false; }
+    document.getElementById("audit-status").textContent = error instanceof Error ? error.message : "Could not import Degree Works.";
+  } finally { await render(); }
 });
