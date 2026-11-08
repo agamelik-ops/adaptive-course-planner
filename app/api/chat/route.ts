@@ -55,6 +55,7 @@ function readContext(raw: Record<string, unknown> | undefined): StudentContext {
     language: text(raw?.language, 40),
     major: text(raw?.major, 60),
     majorSubject: text(raw?.majorSubject, 4)?.toUpperCase(),
+    majorUndecided: raw?.majorUndecided === true || undefined,
     languageSubject: text(raw?.languageSubject, 4)?.toUpperCase(),
     audit: audit ? { open: textList(audit.open), inProgress: textList(audit.inProgress), complete: textList(audit.complete) } : undefined,
     needIds: needs ? { open: textList(needs.open), satisfied: textList(needs.satisfied) } : undefined,
@@ -77,8 +78,9 @@ function systemPrompt(ctx: StudentContext) {
     "",
     "Planning a semester:",
     "- When the student asks for a schedule, a plan, recommendations for next semester, or 'what should I take', call build_schedule. Don't assemble a schedule by hand, and don't also call suggest_courses for the same courses (build_schedule already shows them as cards).",
-    "- Majors: F&M students declare a major in the spring of sophomore year, so first-years and fall sophomores usually show 'Undeclared' in Degree Works. If the student context has no declared major and no 'Interested in majoring in', and the student hasn't named a major in this conversation, do NOT build yet: ask only 'What major are you thinking about? Not sure is fine.' (don't explain the declaration timeline unless asked). Build only after they answer (if they're not sure, build without major_subject). A junior or senior with no declared major: ask 'What's your major?'",
-    "- When the student names a major or interest in chat, pass it as major_subject.",
+    "- Majors: F&M students declare a major in the spring of sophomore year, so first-years and fall sophomores usually show 'Undeclared' in Degree Works. If the student context has no declared major and no 'Interested in majoring in', the student hasn't named a major in this conversation, and the context doesn't say they're not sure yet, do NOT build yet: ask only 'What major are you thinking about? Not sure is fine.' (don't explain the declaration timeline unless asked). Build only after they answer (if they're not sure, build without major_subject). A junior or senior with no declared major: ask 'What's your major?'",
+    "- When the student names a major or interest in chat, pass it as major_subject. If they say they're not sure, pass undecided: true.",
+    "- If build_schedule returns ask_student_exactly, reply with exactly that question and nothing else.",
     "- After build_schedule, reply with one short sentence, e.g. 'Here's your plan, built around Computer Science.' Don't list or describe the courses (the cards do). Only mention not_yet_eligible_in_major if the student asked what they can't take yet. Pass along a note only if the student needs to act on it.",
     "- If they reject a course or want changes (no Fridays, later start, different subject), call build_schedule again with those constraints.",
     "- 'Can I take X?': call check_prerequisites and answer in one or two sentences (yes, or no plus what they need first and whether it's offered this spring). search_courses already hides courses they aren't eligible for.",
@@ -104,6 +106,7 @@ function systemPrompt(ctx: StudentContext) {
   if (ctx.takenCodes?.length) lines.push(`- Already taken or in progress (don't recommend these): ${ctx.takenCodes.join(", ")}`);
   if (ctx.language) lines.push(`- Studying language: ${ctx.language}`);
   if (ctx.major) lines.push(`- Interested in majoring in: ${ctx.major}${ctx.majorSubject ? ` (${ctx.majorSubject})` : ""}`);
+  if (ctx.majorUndecided && !ctx.major) lines.push("- Major: not sure yet (they chose to explore). Don't ask about a major again; call build_schedule with undecided: true.");
   lines.push(ctx.plan.length
     ? `- Current plan: ${ctx.plan.map((course) => `${course.code} ${course.title} (CRN ${course.crn}, ${meeting(course)})`).join("; ")}`
     : "- Current plan: empty");

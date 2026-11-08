@@ -23,6 +23,7 @@ export type StudentContext = {
   language?: string;
   major?: string;
   majorSubject?: string; // subject prefix the student chose in chat, e.g. "CPS"
+  majorUndecided?: boolean; // the student said they're not sure about a major yet
   languageSubject?: string; // e.g. "FRN"
   audit?: { open: string[]; inProgress: string[]; complete: string[] };
   needIds?: { open: string[]; satisfied: string[] }; // advisor need ids, for build_schedule
@@ -44,7 +45,7 @@ export const TOOL_DEFINITIONS = [
     type: "function",
     function: {
       name: "search_courses",
-      description: "Search Spring 2027 sections. Combine filters as needed. Returns at most `limit` sections (default 6, max 10) with times, instructors, gen-ed tags and prerequisites.",
+      description: "Search Spring 2027 sections. Combine filters as needed. Returns at most `limit` sections (default 6, max 10) with times, instructors, gen-ed tags and prerequisites. A query that names a professor or a course code returns all their sections (every result is offered this spring), labeled student_took_this_course_before / in_plan / prereq_status; other searches hide courses the student took or can't take yet.",
       parameters: {
         type: "object",
         properties: {
@@ -81,6 +82,7 @@ export const TOOL_DEFINITIONS = [
           major_subject: { type: "string", description: "Major to plan around (subject code like 'CPS' or a name like 'Economics'). Omit to use their declared/chosen major; if they have none, the plan focuses on requirements and exploration." },
           language_subject: { type: "string", description: "Language they're studying, if different from what their placements suggest." },
           total_courses: { type: "integer", description: "Total courses wanted in the semester, default 4." },
+          undecided: { type: "boolean", description: "Set true only after the student said they aren't sure what to major in." },
           exclude_days: { type: "array", items: { type: "string", enum: ["Mon", "Tue", "Wed", "Thu", "Fri"] } },
           earliest_start: { type: "string", description: "24h time, e.g. '10:00'." },
           latest_end: { type: "string", description: "24h time, e.g. '17:00'." },
@@ -160,8 +162,21 @@ function toDay(value: unknown) {
   return DAY_INDEX[key.charAt(0).toUpperCase() + key.slice(1)];
 }
 
+// "Jing Hu" matches the instructor "Hu, Jing" (whole name words, so "art" doesn't match "Bartholomew").
+function isInstructorQuery(query: string, list: Course[]) {
+  const words = query.toLowerCase().split(/[\s,.]+/).filter((word) => word.length > 1);
+  return words.length > 0 && list.some((course) => course.instructors.some((name) => {
+    const parts = name.toLowerCase().split(/[\s,.]+/);
+    return words.every((word) => parts.includes(word));
+  }));
+}
+
 function searchTool(args: Record<string, unknown>, ctx: StudentContext) {
-  let list = typeof args.query === "string" && args.query.trim() ? searchCourses(args.query) : courses;
+  const query = typeof args.query === "string" ? args.query.trim() : "";
+  let list = query ? searchCourses(query) : courses;
+  // Looking up a professor or a specific course is a factual question: list every
+  // section and label it, instead of hiding ones the student took or can't take yet.
+  const lookup = !!query && (/^[A-Z]{2,4}\s?\d{3}/i.test(query) || isInstructorQuery(query, list));
   const tag = toTag(args.requirement_tag);
   const subject = typeof args.subject === "string" ? args.subject.toUpperCase().trim() : "";
   const maxLevel = typeof args.max_level === "number" ? args.max_level : null;
@@ -183,12 +198,25 @@ function searchTool(args: Record<string, unknown>, ctx: StudentContext) {
     !course.meetings.some((item) => item.days.some((day) => excluded.includes(day))) &&
     (earliest === null || course.meetings.every((item) => item.start >= earliest)) &&
     (latest === null || course.meetings.every((item) => item.end <= latest)) &&
-    !(ctx.classYear && course.closedTo.includes(ctx.classYear)) &&
-    !planCodes.has(course.code) &&
-    (!fitsPlan || !ctx.plan.some((other) => overlaps(course, other))) &&
-    (!eligibleOnly || checkPrereq(course, record).status !== "unmet"));
+    (lookup || (
+      !(ctx.classYear && course.closedTo.includes(ctx.classYear)) &&
+      !planCodes.has(course.code) &&
+      (!fitsPlan || !ctx.plan.some((other) => overlaps(course, other))) &&
+      (!eligibleOnly || checkPrereq(course, record).status !== "unmet"))));
 
-  return { total_matches: list.length, results: list.slice(0, limit).map((course) => ({ ...brief(course), prereq_status: checkPrereq(course, record).status })) };
+  const taken = new Set(ctx.takenCodes ?? []);
+  return {
+    total_matches: list.length,
+    results: list.slice(0, limit).map((course) => ({
+      ...brief(course),
+      prereq_status: checkPrereq(course, record).status,
+      ...(lookup ? {
+        student_took_this_course_before: taken.has(course.code) || undefined,
+        in_plan: ctx.plan.some((other) => other.crn === course.crn) || undefined,
+        closed_to_student: (ctx.classYear && course.closedTo.includes(ctx.classYear)) || undefined,
+      } : {}),
+    })),
+  };
 }
 
 function findSection(value: unknown) {
@@ -222,6 +250,12 @@ function prereqTool(args: Record<string, unknown>, ctx: StudentContext) {
 const DAY_NAMES: Record<string, number> = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 };
 function scheduleTool(args: Record<string, unknown>, ctx: StudentContext, collected: AiSuggestion[]) {
   const major = majorFor(ctx, args.major_subject);
+  // F&M students declare a major in the spring of sophomore year, so many show
+  // "Undeclared". Ask before planning; enforced here so the AI can't skip it.
+  if (!major && !ctx.majorUndecided && args.undecided !== true) {
+    const upper = ctx.classYear === "JR" || ctx.classYear === "SR";
+    return { not_built: "No major known yet.", ask_student_exactly: upper ? "What's your major?" : "What major are you thinking about? Not sure is fine." };
+  }
   const language = typeof args.language_subject === "string" ? matchSubject(args.language_subject, LANGUAGE_SUBJECTS) : ctx.languageSubject ?? null;
   const needs = (ctx.needIds?.open ?? []).map(needFromId).filter((need) => !!need);
   const satisfiedTags = (ctx.needIds?.satisfied ?? []).flatMap((id) => needFromId(id)?.dist ?? []);

@@ -396,6 +396,7 @@ export default function ChatWidget() {
       mathPlacement: audit?.profile?.mathPlacement,
       takenCodes: (audit?.courses ?? []).filter((course) => course.status === "completed" || course.status === "in-progress").map((course) => course.code),
       majorSubject: prefs.majorPrefix ?? undefined,
+      majorUndecided: prefs.majorPrefix === null ? true : undefined, // tapped "Not sure yet"
       languageSubject: prefs.languagePrefix ?? undefined,
       needIds: summary ? { open: summary.open.map((need) => need.id), satisfied: [...summary.inProgress, ...summary.complete].map((need) => need.id) } : undefined,
       audit: summary ? {
