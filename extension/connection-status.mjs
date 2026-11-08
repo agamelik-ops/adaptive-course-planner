@@ -24,8 +24,8 @@ export function degreeWorksView(audit, job, now = Date.now()) {
     linked, importing,
     state: importing ? "connecting" : linked ? "connected" : "disconnected",
     label: importing ? "Importing Degree Works…" : linked ? "Degree Works linked" : "Degree Works not linked",
-    detail: linked ? `${audit.courses?.length ?? 0} courses · ${audit.requirements.length} requirements · Imported ${new Date(audit.checkedAt).toLocaleString()}` : "Import your Academic worksheet to use it for recommendations.",
-    note: importing ? "Review the import preview in your Degree Works tab." : linked ? "Saved audit snapshot · Reimport after your record changes" : "No audit has been imported yet.",
+    detail: linked ? `Last imported ${new Date(audit.checkedAt).toLocaleString()}` : "Import your Academic worksheet to use it for recommendations.",
+    note: importing ? "Review the import preview in your Degree Works tab." : linked ? "Your academic history and degree progress are saved as a snapshot. Update after your record changes." : "No audit has been imported yet.",
     button: importing ? "Importing…" : linked ? "Update Degree Works" : "Import Degree Works",
   };
 }

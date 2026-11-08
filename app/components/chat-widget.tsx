@@ -314,7 +314,7 @@ export default function ChatWidget() {
             <div className="chat-avatar" aria-hidden="true">✦</div>
             <div>
               <strong>Planning Assistant</strong>
-              <span>{audit ? `Degree Works loaded · ${audit.requirements.length} requirements · ${audit.courses?.length ?? 0} courses` : "Spring 2027 course advisor"}</span>
+              <span>{audit ? "Degree Works linked · Saved academic history" : "Spring 2027 course advisor"}</span>
             </div>
             <button className="chat-close" aria-label="Close chat" onClick={() => setOpen(false)}>×</button>
           </header>

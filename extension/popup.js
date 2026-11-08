@@ -61,7 +61,7 @@ auditButton.addEventListener("click", async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const response = await chrome.runtime.sendMessage({ type: "import-degree-works", tabId: tab?.id });
     if (response?.error) throw new Error(response.error);
-    document.getElementById("audit-status").textContent = response.result ? `Degree Works imported · ${response.result.courses} courses · ${response.result.requirements} requirements` : "Import cancelled. Your saved audit was not changed.";
+    document.getElementById("audit-status").textContent = response.result ? "Degree Works imported. Your academic history and degree progress are saved." : "Import cancelled. Your saved audit was not changed.";
   } catch (error) {
     document.getElementById("audit-status").textContent = error instanceof Error ? error.message : "Could not import Degree Works.";
   } finally { await render(); }
