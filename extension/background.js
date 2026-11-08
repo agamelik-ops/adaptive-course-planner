@@ -1,4 +1,5 @@
 import { importDegreeAudit } from "./degree-audit.mjs";
+import { PLANNER_URL } from "./config.mjs";
 import { syncAllAvailability } from "./full-sync.mjs";
 
 const autoKey = "fm-availability-auto";
@@ -130,7 +131,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     auditImportBusy = true;
     try {
       await chrome.storage.local.set({ degreeAuditImport: { state: "importing", updatedAt: Date.now(), message: "Reading Degree Works. Review the preview in that tab." } });
-      const result = await importDegreeAudit(await chrome.tabs.get(message.tabId));
+      const result = await importDegreeAudit(await chrome.tabs.get(message.tabId), PLANNER_URL);
       await chrome.storage.local.set({ degreeAuditImport: { state: result ? "complete" : "cancelled", updatedAt: Date.now(), message: result ? "Degree Works updated. Your planner can use the saved audit." : "Import cancelled. Your previous saved audit is unchanged." } });
       respond({ result });
     } catch (error) {

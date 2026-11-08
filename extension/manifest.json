@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "F&M Adaptive Course Planner",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Plan courses, sync Spring 2027 availability, and import Degree Works requirements.",
   "action": {
     "default_title": "F&M Course Planner",
@@ -28,6 +28,7 @@
     },
     {
       "matches": [
+        "https://adaptive-course-planner.vercel.app/*",
         "http://localhost:3000/*"
       ],
       "js": [

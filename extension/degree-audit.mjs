@@ -79,7 +79,8 @@ export async function extractDegreeAudit() {
     warnings: ["Imported from the loaded worksheet, not an official transcript or verified complete audit.", ...(collapsed ? [`${collapsed} academic blocks remained collapsed.`] : []), ...(!courses.length ? ["Course history could not be read from this worksheet."] : [])] };
 }
 
-export async function importDegreeAudit(tab) {
+// plannerUrl comes from config.mjs via background.js (this file is also loaded by tests without imports).
+export async function importDegreeAudit(tab, plannerUrl) {
   if (!tab?.id || !tab.url) throw new Error("Open your Degree Works audit first.");
   const url = new URL(tab.url);
   if (url.protocol !== "https:" || url.hostname !== "degreeworks.fandm.edu") throw new Error("Open your F&M Academic worksheet, then click Import Degree Works.");
@@ -92,6 +93,6 @@ export async function importDegreeAudit(tab) {
   ] });
   if (!approved) return false;
   await chrome.storage.local.set({ degreeAudit: audit });
-  await chrome.tabs.create({ url: "http://localhost:3000/" });
+  await chrome.tabs.create({ url: plannerUrl });
   return { requirements: audit.requirements.length, courses: audit.courses?.length || 0 };
 }

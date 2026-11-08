@@ -1,4 +1,5 @@
 import { connectionView, degreeWorksView } from "./connection-status.mjs";
+import { PLANNER_URL } from "./config.mjs";
 
 const status = document.getElementById("status");
 const start = document.getElementById("sync");
@@ -53,7 +54,7 @@ stop.addEventListener("click", async () => {
   const response = await chrome.runtime.sendMessage({ type: "stop-auto" });
   if (response?.error) status.textContent = response.error;
 });
-document.getElementById("open").addEventListener("click", () => chrome.tabs.create({ url: "http://localhost:3000/" }));
+document.getElementById("open").addEventListener("click", () => chrome.tabs.create({ url: PLANNER_URL }));
 
 const auditButton = document.getElementById("audit");
 auditButton.addEventListener("click", async () => {
