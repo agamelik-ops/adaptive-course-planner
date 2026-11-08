@@ -360,14 +360,14 @@ The tests use simulated pages and fixtures. After changing the extension, also r
 - **Auto-deploy:** every push to `main` on GitHub deploys to https://adaptive-course-planner.vercel.app/ within a minute or two. Other branches don't change the live site.
 - **Environment:** `AI_API_KEY` is set under Vercel → Project → Settings → Environment Variables. Add `AI_BASE_URL` or `AI_MODEL` there too if you change them, then redeploy.
 - **Checking a deploy:** look at the ✓ or ✗ next to the commit on GitHub, or run `gh api repos/agamelik-ops/adaptive-course-planner/commits/<sha>/status`.
-- **"Deployment was blocked":** the project is on Vercel's free (Hobby) plan with a private repo. Vercel only deploys commits whose author it can match to the project owner's account.
+- **"Deployment was blocked":** the project is on Vercel's free (Hobby) plan. While the repo was private, Vercel blocked every commit whose author it couldn't match to the project owner's GitHub account. The repo is public now, which normally lifts that restriction, but a proper Git identity is still a good idea:
   - Every committer should set a real Git identity linked to their GitHub account:
     ```bash
     git config --global user.name "Your Name"
     git config --global user.email "<id>+<username>@users.noreply.github.com"   # or a verified GitHub email
     ```
-  - Commits made without this get an address like `you@Your-MacBook.local`, and Vercel blocks them.
-  - Teammates' own commits may still be blocked on the Hobby plan. Workarounds: the project owner does the final merge into `main` with `git merge --no-ff <branch>`, so the newest commit is theirs; or make the repo public; or upgrade Vercel.
+  - Commits made without this get an address like `you@Your-MacBook.local`, which GitHub and Vercel can't link to anyone.
+  - If a teammate's push is still blocked, the project owner can do the final merge into `main` with `git merge --no-ff <branch>`, so the newest commit is theirs.
   - A blocked deploy isn't retried. Push a new commit, e.g. `git commit --allow-empty -m "Redeploy"`.
 
 ## Team git workflow
